@@ -1,0 +1,88 @@
+spring:
+  application:
+    name: PoorToRich
+
+  datasource:
+    driver-class-name: org.mariadb.jdbc.Driver
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      idle-timeout: 30000
+      connection-timeout: 30000
+      max-lifetime: 1800000
+
+  jpa:
+    database-platform: org.hibernate.dialect.MariaDBDialect
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+    hibernate:
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO}
+
+  redis:
+    host: ${REDIS_HOST}
+    port: ${REDIS_PORT}
+
+  mail:
+    host: smtp.gmail.com
+    port: ${SMTP_PORT}
+    username: ${GOOGLE_EMAIL}
+    password: ${GOOGLE_APP_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+  security:
+    oauth2:
+      client:
+        registration:
+          kakao:
+            client-authentication-method: client_secret_post
+            client-name: Kakao
+            client-id: ${KAKAO_KEY}
+            client-secret: ${KAKAO_SECRET}
+            redirect-uri: https://api.poortorich.site/login/oauth2/code/kakao
+            authorization-grant-type: authorization_code
+            scope:
+              - profile_nickname
+              - profile_image
+              - account_email
+        provider:
+          kakao:
+            authorization-uri: https://kauth.kakao.com/oauth/authorize
+            token-uri: https://kauth.kakao.com/oauth/token
+            user-info-uri: https://kapi.kakao.com/v2/user/me
+            user-name-attribute: id
+
+cloud:
+  aws:
+    s3:
+      bucket: ${S3_BUCKET_NAME}
+    stack:
+      auto: false
+    region:
+      static: ap-northeast-2
+    credentials:
+      accessKey: ${S3_ACCESS_KEY}
+      secretKey: ${S3_SECRET_ACCESS_KEY}
+
+  auth-code-expiration-millis: 600000
+
+jwt:
+  secret:
+    key: ${JWT_SECRET_KEY}
+
+kakao:
+  admin:
+    key: ${KAKAO_ADMIN}
