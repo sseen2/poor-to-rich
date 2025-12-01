@@ -43,6 +43,7 @@ dependencies {
     implementation 'com.fasterxml.jackson.core:jackson-databind'
     implementation 'com.sksamuel.scrimage:scrimage-core:4.0.32'
     implementation 'com.sksamuel.scrimage:scrimage-webp:4.0.32'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
     runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.3'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.3'
@@ -60,6 +61,7 @@ dependencies {
     testImplementation 'org.assertj:assertj-core:3.24.2'
     testImplementation 'com.h2database:h2:2.2.224'
     testImplementation 'io.jsonwebtoken:jjwt-api:0.11.5'
+    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testRuntimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'

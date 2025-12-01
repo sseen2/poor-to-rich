@@ -20,6 +20,21 @@ services:
     volumes:
       - redis_data:/var/lib/redis
 
+  prometheus:
+    image: prom/prometheus
+    container_name: poor_to_rich_prometheus
+    ports:
+      - ${PROMETHEUS_BINDING_PORT}:${PROMETHEUS_PORT}
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - ${GRAFANA_BINDING_PORT}:${GRAFANA_PORT}
+
   app:
     build: .
     container_name: poor_to_rich_application

@@ -1,0 +1,19 @@
+global:
+  scrape_interval: 15s
+
+  external_labels:
+    monitor: 'poor-to-rich-monitor'
+    env: 'dev'
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']
+  - job_name: 'spring-actuator'
+    metrics_path: '/actuator/prometheus'
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['app:8080']
