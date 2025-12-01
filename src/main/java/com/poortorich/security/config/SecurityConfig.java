@@ -40,6 +40,20 @@ public class SecurityConfig {
     private final CustomOAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
 
     @Bean
+    @Order(0)
+    public SecurityFilterChain actuatorFilterChain(HttpSecurity http) throws Exception {
+        http
+                .securityMatcher("/actuator/**")
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+                .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                );
+
+        return http.build();
+    }
+
+    @Bean
     @Order(1)
     public SecurityFilterChain oAuth2FilterChain(HttpSecurity http) throws Exception {
         http
@@ -60,7 +74,8 @@ public class SecurityConfig {
         http
                 .securityMatcher(request -> {
                     String uri = request.getRequestURI();
-                    return !uri.startsWith("/oauth2/") &&
+                    return !uri.equals("/actuator") &&
+                            !uri.startsWith("/oauth2/") &&
                             !uri.startsWith("/login/oauth2/") &&
                             !uri.equals("/login") &&
                             !uri.equals("/favicon.ico");

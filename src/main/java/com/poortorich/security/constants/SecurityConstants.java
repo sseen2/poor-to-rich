@@ -7,12 +7,16 @@ public class SecurityConstants {
     public static final List<String> ALLOWED_ORIGINS = List.of("http://localhost:8080",
             "https://localhost:5173",
             "https://localhost:4173",
+            "https://localhost:9090",
             "https://poortorich.site",
             "https://www.poortorich.site"
     );
     public static final List<String> ALLOWED_METHOD = List.of("GET", "POST", "PUT", "DELETE", "PATCH");
     public static final List<String> ALLOWED_HEADERS = List.of("authorization", "content-type", "x-auth-token");
     public static final String[] PERMIT_ALL_ENDPOINTS = {
+            "/actuator/prometheus",
+            "/actuator/health",
+            "/actuator/info",
             "/auth/health",
             "/auth/login",
             "/auth/refresh",
