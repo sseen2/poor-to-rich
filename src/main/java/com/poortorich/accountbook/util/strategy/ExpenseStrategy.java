@@ -1,6 +1,8 @@
 package com.poortorich.accountbook.util.strategy;
 
 import com.poortorich.accountbook.entity.AccountBook;
+import com.poortorich.accountbook.model.domain.DailyAmount;
+import com.poortorich.accountbook.model.domain.PeriodAmount;
 import com.poortorich.category.entity.Category;
 import com.poortorich.expense.entity.Expense;
 import com.poortorich.expense.repository.ExpenseRepository;
@@ -80,7 +82,8 @@ public class ExpenseStrategy implements AccountBookStrategy {
             LocalDate startDate,
             LocalDate endDate
     ) {
-        return expenseRepository.findByUserAndCategoryAndExpenseDateBetween(user, category, startDate, endDate).stream()
+        return expenseRepository.findByUserAndCategoryAndExpenseDateBetween(user, category, startDate, endDate)
+                .stream()
                 .map(AccountBook.class::cast)
                 .toList();
     }
@@ -176,5 +179,25 @@ public class ExpenseStrategy implements AccountBookStrategy {
     @Override
     public List<UserExpenseAggregate> findExpenseAggregatesByUsersAndDateRange(List<User> users, LocalDate startDate, LocalDate endDate) {
         return expenseRepository.findExpenseAggregatesByUsersAndDateRange(users, startDate, endDate);
+    }
+
+    @Override
+    public Long sumAmountByDateBetween(User user, LocalDate startDate, LocalDate endDate) {
+        return expenseRepository.sumAmountByDateBetween(user, startDate, endDate);
+    }
+
+    @Override
+    public List<DailyAmount> sumDailyAmounts(User user, LocalDate startDate, LocalDate endDate) {
+        return expenseRepository.sumDailyAmounts(user, startDate, endDate);
+    }
+
+    @Override
+    public Long sumAmountByDateAndCategory(User user, Category category, LocalDate startDate, LocalDate endDate) {
+        return expenseRepository.sumExpenseAmountByDateAndCategory(user, category, startDate, endDate);
+    }
+
+    @Override
+    public List<PeriodAmount> sumPeriodAmountsByCategory(User user, Category category, LocalDate startDate, LocalDate endDate) {
+        return expenseRepository.sumPeriodExpenseAmountsByCategory(user, category, startDate, endDate);
     }
 }

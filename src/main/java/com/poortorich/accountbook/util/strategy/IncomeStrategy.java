@@ -1,6 +1,8 @@
 package com.poortorich.accountbook.util.strategy;
 
 import com.poortorich.accountbook.entity.AccountBook;
+import com.poortorich.accountbook.model.domain.DailyAmount;
+import com.poortorich.accountbook.model.domain.PeriodAmount;
 import com.poortorich.category.entity.Category;
 import com.poortorich.income.entity.Income;
 import com.poortorich.income.repository.IncomeRepository;
@@ -168,6 +170,26 @@ public class IncomeStrategy implements AccountBookStrategy {
     @Override
     public List<UserExpenseAggregate> findExpenseAggregatesByUsersAndDateRange(List<User> users, LocalDate startDate, LocalDate endDate) {
         return List.of();
+    }
+
+    @Override
+    public Long sumAmountByDateBetween(User user, LocalDate startDate, LocalDate endDate) {
+        return incomeRepository.sumAmountByDateBetween(user, startDate, endDate);
+    }
+
+    @Override
+    public List<DailyAmount> sumDailyAmounts(User user, LocalDate startDate, LocalDate endDate) {
+        return incomeRepository.sumDailyAmounts(user, startDate, endDate);
+    }
+
+    @Override
+    public Long sumAmountByDateAndCategory(User user, Category category, LocalDate startDate, LocalDate endDate) {
+        return incomeRepository.sumIncomeAmountByDateAndCategory(user, category, startDate, endDate);
+    }
+
+    @Override
+    public List<PeriodAmount> sumPeriodAmountsByCategory(User user, Category category, LocalDate startDate, LocalDate endDate) {
+        return incomeRepository.sumPeriodIncomeAmountsByCategory(user, category, startDate, endDate);
     }
 
     private Slice<AccountBook> mapToAccountBookSlice(Slice<Income> incomesPage, Pageable pageable) {

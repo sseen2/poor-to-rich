@@ -1,6 +1,7 @@
 package com.poortorich.chart.mapper;
 
 import com.poortorich.accountbook.entity.AccountBook;
+import com.poortorich.accountbook.model.domain.PeriodAmount;
 import com.poortorich.accountbook.util.AccountBookCalculator;
 import com.poortorich.accountbook.util.AccountBookGrouper;
 import com.poortorich.category.entity.Category;
@@ -78,6 +79,18 @@ public class ChartDataMapper {
                             .period(PeriodFormatter.formatMonthKorean(dateInfo.getStartDate().getMonth()))
                             .totalAmount(total)
                             .label(AmountFormatter.convertAmount(total))
+                            .build();
+                })
+                .toList();
+    }
+
+    public List<PeriodTotal> mapToPeriodTotalsForVertical(List<PeriodAmount> monthlyTotalAmounts) {
+        return monthlyTotalAmounts.stream()
+                .map(monthlyAmount -> {
+                    return PeriodTotal.builder()
+                            .period(monthlyAmount.getPeriod())
+                            .totalAmount(monthlyAmount.getTotalAmount())
+                            .label(AmountFormatter.convertAmount(monthlyAmount.getTotalAmount()))
                             .build();
                 })
                 .toList();

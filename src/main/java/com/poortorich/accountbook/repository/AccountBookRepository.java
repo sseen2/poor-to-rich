@@ -2,6 +2,8 @@ package com.poortorich.accountbook.repository;
 
 import com.poortorich.accountbook.entity.AccountBook;
 import com.poortorich.accountbook.enums.AccountBookType;
+import com.poortorich.accountbook.model.domain.DailyAmount;
+import com.poortorich.accountbook.model.domain.PeriodAmount;
 import com.poortorich.accountbook.util.strategy.AccountBookStrategyFactory;
 import com.poortorich.category.entity.Category;
 import com.poortorich.ranking.model.UserExpenseAggregate;
@@ -48,6 +50,14 @@ public class AccountBookRepository {
                 .getStrategy(type)
                 .findByUserAndCategory(user, category)
                 .isEmpty();
+    }
+
+    public Long getTotalAmount(User user, LocalDate startDate, LocalDate endDate, AccountBookType type) {
+        return strategyFactory.getStrategy(type).sumAmountByDateBetween(user, startDate, endDate);
+    }
+
+    public List<DailyAmount> getDailyAmounts(User user, LocalDate startDate, LocalDate endDate, AccountBookType type) {
+        return strategyFactory.getStrategy(type).sumDailyAmounts(user, startDate, endDate);
     }
 
     public List<AccountBook> findByUserAndExpenseAndDateBetween(
@@ -161,5 +171,15 @@ public class AccountBookRepository {
 
         return strategyFactory.getStrategy(AccountBookType.EXPENSE)
                 .findExpenseAggregatesByUsersAndDateRange(users, startDate, endDate);
+    }
+
+    public Long sumAmountByDateAndCategory(User user, Category category, LocalDate startDate, LocalDate endDate) {
+        return strategyFactory.getStrategy(category)
+                .sumAmountByDateAndCategory(user, category, startDate, endDate);
+    }
+
+    public List<PeriodAmount> sumPeriodAmountsByCategory(User user, Category category, LocalDate startDate, LocalDate endDate) {
+        return strategyFactory.getStrategy(category)
+                .sumPeriodAmountsByCategory(user, category, startDate, endDate);
     }
 }

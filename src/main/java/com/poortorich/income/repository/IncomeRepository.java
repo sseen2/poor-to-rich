@@ -1,6 +1,8 @@
 package com.poortorich.income.repository;
 
 import com.poortorich.accountbook.entity.AccountBook;
+import com.poortorich.accountbook.model.domain.DailyAmount;
+import com.poortorich.accountbook.model.domain.PeriodAmount;
 import com.poortorich.category.entity.Category;
 import com.poortorich.income.entity.Income;
 import com.poortorich.user.entity.User;
@@ -19,10 +21,36 @@ public interface IncomeRepository extends JpaRepository<Income, Long> {
 
     Optional<AccountBook> findByUserAndId(User user, Long id);
 
-    List<Income> findByUserAndIncomeDateBetween(User user, LocalDate startDate, LocalDate endDate);
+    @Query("""
+        SELECT i
+          FROM Income i
+          LEFT JOIN FETCH i.generatedIterationIncomes gii
+          JOIN FETCH i.user u
+         WHERE i.user = :user
+           AND i.incomeDate BETWEEN :startDate AND :endDate
+    """)
+    List<Income> findByUserAndIncomeDateBetween(
+            @Param("user") User user,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
 
-    List<Income> findByUserAndCategoryAndIncomeDateBetween(User user, Category category, LocalDate startDate,
-                                                           LocalDate endDate);
+    @Query("""
+        SELECT i
+          FROM Income i
+          LEFT JOIN FETCH i.generatedIterationIncomes gii
+          JOIN FETCH i.category c
+          JOIN FETCH i.user u
+         WHERE i.user = :user
+           AND i.category = :category
+           AND i.incomeDate BETWEEN :startDate AND :endDate
+    """)
+    List<Income> findByUserAndCategoryAndIncomeDateBetween(
+            @Param("user") User user,
+            @Param("category") Category category,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
 
     List<Income> findByUserAndCategoryAndIncomeDate(User user, Category category, LocalDate incomeDate);
 
@@ -127,4 +155,66 @@ public interface IncomeRepository extends JpaRepository<Income, Long> {
     void deleteByUser(User user);
 
     List<Income> findByUserAndCategory(User user, Category category);
+
+    @Query("""
+        SELECT COALESCE(SUM(i.cost), 0L)
+          FROM Income i
+         WHERE i.user = :user
+           AND i.incomeDate BETWEEN :startDate AND :endDate
+    """)
+    Long sumAmountByDateBetween(
+            @Param("user") User user,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    @Query("""
+        SELECT new com.poortorich.accountbook.model.domain.DailyAmount(
+                   i.incomeDate,
+                   COALESCE(SUM(i.cost), 0L)
+               )
+          FROM Income i
+         WHERE i.user = :user
+           AND i.incomeDate BETWEEN :startDate AND :endDate
+         GROUP BY i.incomeDate
+         ORDER BY i.incomeDate
+    """)
+    List<DailyAmount> sumDailyAmounts(
+            @Param("user") User user,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    @Query("""
+        SELECT COALESCE(SUM(i.cost), 0L)
+          FROM Income i
+         WHERE i.user = :user
+           AND i.category = :category
+           AND i.incomeDate BETWEEN :startDate AND :endDate
+    """)
+    Long sumIncomeAmountByDateAndCategory(
+            @Param("user") User user,
+            @Param("category") Category category,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    @Query("""
+        SELECT new com.poortorich.accountbook.model.domain.PeriodAmount(
+                    FUNCTION('DATE_FORMAT', i.incomeDate, '%Y-%m'),
+                    COALESCE(SUM(i.cost), 0L)
+               )
+          FROM Income i
+         WHERE i.user = :user
+           AND i.category = :category
+           AND i.incomeDate BETWEEN :startDate AND :endDate
+         GROUP BY FUNCTION('DATE_FORMAT', i.incomeDate, '%Y-%m')
+         ORDER BY FUNCTION('DATE_FORMAT', i.incomeDate, '%Y-%m') ASC
+    """)
+    List<PeriodAmount> sumPeriodIncomeAmountsByCategory(
+            @Param("user") User user,
+            @Param("category") Category category,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
 }

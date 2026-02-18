@@ -9,7 +9,6 @@ import com.poortorich.accountbook.util.AccountBookExtractor;
 import com.poortorich.accountbook.util.AccountBookGrouper;
 import com.poortorich.chart.util.PeriodFormatter;
 import com.poortorich.transaction.response.DailyDetailsResponse;
-import com.poortorich.transaction.response.DailyFinance;
 import com.poortorich.transaction.response.DailyTransaction;
 import com.poortorich.transaction.response.Logs;
 import com.poortorich.transaction.response.WeeklyDetailsResponse;
@@ -102,25 +101,6 @@ public class TransactionService {
                             .date(PeriodFormatter.formatYearMonth(date))
                             .countOfTransactions((long) transactions.size())
                             .transactions(transactions)
-                            .build();
-                })
-                .toList();
-    }
-
-    public List<DailyFinance> getDailyFinance(List<AccountBook> monthlyIncomes, List<AccountBook> monthlyExpenses) {
-        List<AccountBook> monthlyAccountBooks = mergeAccountBook(monthlyIncomes, monthlyExpenses);
-        return AccountBookGrouper.groupByDate(monthlyAccountBooks).entrySet().stream()
-                .map(entry -> {
-                    LocalDate date = entry.getKey();
-                    List<AccountBook> incomes =
-                            AccountBookExtractor.extractByType(entry.getValue(), AccountBookType.INCOME);
-                    List<AccountBook> expenses =
-                            AccountBookExtractor.extractByType(entry.getValue(), AccountBookType.EXPENSE);
-
-                    return DailyFinance.builder()
-                            .date(date.toString())
-                            .incomeAmount(AccountBookCalculator.sum(incomes))
-                            .expenseAmount(AccountBookCalculator.sum(expenses))
                             .build();
                 })
                 .toList();

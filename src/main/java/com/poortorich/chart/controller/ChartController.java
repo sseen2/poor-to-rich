@@ -121,6 +121,34 @@ public class ChartController {
         );
     }
 
+    @GetMapping("/{categoryId}/vertical/pev")
+    public ResponseEntity<BaseResponse> getCategoryVerticalPev(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable("categoryId") Long categoryId,
+            @RequestParam("date")
+            @Pattern(regexp = DatePattern.YEAR_REGEX, message = DateResponseMessage.UNSUPPORTED_DATE_FORMAT)
+            String date
+    ) {
+        return DataResponse.toResponseEntity(
+                ChartResponse.GET_CATEGORY_VERTICAL_SUCCESS,
+                chartFacade.getCategoryVertical_pev(userDetails.getUsername(), categoryId, date)
+        );
+    }
+
+    @GetMapping("/{categoryId}/vertical/query")
+    public ResponseEntity<BaseResponse> getCategoryVerticalQuery(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable("categoryId") Long categoryId,
+            @RequestParam("date")
+            @Pattern(regexp = DatePattern.YEAR_REGEX, message = DateResponseMessage.UNSUPPORTED_DATE_FORMAT)
+            String date
+    ) {
+        return DataResponse.toResponseEntity(
+                ChartResponse.GET_CATEGORY_VERTICAL_SUCCESS,
+                chartFacade.getCategoryVertical_query(userDetails.getUsername(), categoryId, date)
+        );
+    }
+
     @GetMapping("/{categoryId}/vertical")
     public ResponseEntity<BaseResponse> getCategoryVertical(
             @AuthenticationPrincipal UserDetails userDetails,
@@ -131,7 +159,7 @@ public class ChartController {
     ) {
         return DataResponse.toResponseEntity(
                 ChartResponse.GET_CATEGORY_VERTICAL_SUCCESS,
-                chartFacade.getCategoryVertical(userDetails.getUsername(), categoryId, date)
+                chartFacade.getCategoryVertical_stats(userDetails.getUsername(), categoryId, date)
         );
     }
 }

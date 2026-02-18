@@ -1,6 +1,7 @@
 package com.poortorich.chart.factory;
 
 import com.poortorich.accountbook.entity.AccountBook;
+import com.poortorich.accountbook.model.domain.PeriodAmount;
 import com.poortorich.accountbook.util.AccountBookCalculator;
 import com.poortorich.chart.aggregator.ChartDataAggregator;
 import com.poortorich.chart.mapper.ChartDataMapper;
@@ -76,6 +77,21 @@ public class ChartResponseFactory {
                 .period(PeriodFormatter.formatLocalDateRange(yearInfo.getStartDate(), yearInfo.getEndDate()))
                 .totalAmount(AccountBookCalculator.sum(accountBooks))
                 .monthlyAmounts(dataMapper.mapToPeriodTotalsForVertical(monthlyAccountBooks))
+                .build();
+    }
+
+    public CategoryVerticalResponse createCategoryVerticalResponse(
+            YearInformation yearInfo,
+            List<PeriodAmount> monthlyTotalAmounts
+    ) {
+        Long totalAmount = monthlyTotalAmounts.stream()
+                .mapToLong(PeriodAmount::getTotalAmount)
+                .sum();
+
+        return CategoryVerticalResponse.builder()
+                .period(PeriodFormatter.formatLocalDateRange(yearInfo.getStartDate(), yearInfo.getEndDate()))
+                .totalAmount(totalAmount)
+                .monthlyAmounts(dataMapper.mapToPeriodTotalsForVertical(monthlyTotalAmounts))
                 .build();
     }
 

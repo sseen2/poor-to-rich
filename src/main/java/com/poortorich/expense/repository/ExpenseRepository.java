@@ -1,5 +1,7 @@
 package com.poortorich.expense.repository;
 
+import com.poortorich.accountbook.model.domain.DailyAmount;
+import com.poortorich.accountbook.model.domain.PeriodAmount;
 import com.poortorich.category.entity.Category;
 import com.poortorich.expense.entity.Expense;
 import com.poortorich.ranking.model.UserExpenseAggregate;
@@ -20,10 +22,36 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
     Optional<Expense> findByUserAndId(User user, Long id);
 
-    List<Expense> findByUserAndExpenseDateBetween(User user, LocalDate startDate, LocalDate endDate);
+    @Query("""
+        SELECT e
+          FROM Expense e
+          LEFT JOIN FETCH e.generatedIterationExpenses gie
+          JOIN FETCH e.user u
+         WHERE e.user = :user
+           AND e.expenseDate BETWEEN :startDate AND :endDate
+    """)
+    List<Expense> findByUserAndExpenseDateBetween(
+            @Param("user") User user,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
 
-    List<Expense> findByUserAndCategoryAndExpenseDateBetween(User user, Category category, LocalDate startDate,
-                                                             LocalDate endDate);
+    @Query("""
+        SELECT e
+          FROM Expense e
+          LEFT JOIN FETCH e.generatedIterationExpenses gie
+          JOIN FETCH e.category c
+          JOIN FETCH e.user u
+         WHERE e.user = :user
+           AND e.category = :category
+           AND e.expenseDate BETWEEN :startDate AND :endDate
+    """)
+    List<Expense> findByUserAndCategoryAndExpenseDateBetween(
+            @Param("user") User user,
+            @Param("category") Category category,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
 
     List<Expense> findByUserAndCategoryAndExpenseDate(User user, Category category, LocalDate expenseDate);
 
@@ -143,6 +171,68 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
             """)
     List<UserExpenseAggregate> findExpenseAggregatesByUsersAndDateRange(
             @Param("users") List<User> users,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    @Query("""
+        SELECT COALESCE(SUM(e.cost), 0L)
+          FROM Expense e
+         WHERE e.user = :user
+           AND e.expenseDate BETWEEN :startDate AND :endDate
+    """)
+    Long sumAmountByDateBetween(
+            @Param("user") User user,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    @Query("""
+        SELECT new com.poortorich.accountbook.model.domain.DailyAmount(
+                   e.expenseDate,
+                   COALESCE(SUM(e.cost), 0L)
+               )
+          FROM Expense e
+         WHERE e.user = :user
+           AND e.expenseDate BETWEEN :startDate AND :endDate
+         GROUP BY e.expenseDate
+         ORDER BY e.expenseDate
+    """)
+    List<DailyAmount> sumDailyAmounts(
+            @Param("user") User user,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    @Query("""
+        SELECT COALESCE(SUM(e.cost), 0L)
+          FROM Expense e
+         WHERE e.user = :user
+           AND e.category = :category
+           AND e.expenseDate BETWEEN :startDate AND :endDate
+    """)
+    Long sumExpenseAmountByDateAndCategory(
+            @Param("user") User user,
+            @Param("category") Category category,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    @Query("""
+        SELECT new com.poortorich.accountbook.model.domain.PeriodAmount(
+                    FUNCTION('DATE_FORMAT', e.expenseDate, '%Y-%m'),
+                    COALESCE(SUM(e.cost), 0L)
+               )
+          FROM Expense e
+         WHERE e.user = :user
+           AND e.category = :category
+           AND e.expenseDate BETWEEN :startDate AND :endDate
+         GROUP BY FUNCTION('DATE_FORMAT', e.expenseDate, '%Y-%m')
+         ORDER BY FUNCTION('DATE_FORMAT', e.expenseDate, '%Y-%m') ASC
+    """)
+    List<PeriodAmount> sumPeriodExpenseAmountsByCategory(
+            @Param("user") User user,
+            @Param("category") Category category,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
     );

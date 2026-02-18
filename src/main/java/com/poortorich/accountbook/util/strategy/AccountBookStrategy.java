@@ -1,6 +1,8 @@
 package com.poortorich.accountbook.util.strategy;
 
 import com.poortorich.accountbook.entity.AccountBook;
+import com.poortorich.accountbook.model.domain.DailyAmount;
+import com.poortorich.accountbook.model.domain.PeriodAmount;
 import com.poortorich.category.entity.Category;
 import com.poortorich.ranking.model.UserExpenseAggregate;
 import com.poortorich.user.entity.User;
@@ -66,4 +68,12 @@ public interface AccountBookStrategy {
             LocalDate startDate,
             LocalDate endDate
     );
+
+    Long sumAmountByDateBetween(User user, LocalDate startDate, LocalDate endDate);
+
+    List<DailyAmount> sumDailyAmounts(User user, LocalDate startDate, LocalDate endDate);
+
+    Long sumAmountByDateAndCategory(User user, Category category, LocalDate startDate, LocalDate endDate);
+
+    List<PeriodAmount> sumPeriodAmountsByCategory(User user, Category category, LocalDate startDate, LocalDate endDate);
 }

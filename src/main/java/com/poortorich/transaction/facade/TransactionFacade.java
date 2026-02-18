@@ -2,18 +2,19 @@ package com.poortorich.transaction.facade;
 
 import com.poortorich.accountbook.entity.AccountBook;
 import com.poortorich.accountbook.enums.AccountBookType;
+import com.poortorich.accountbook.model.domain.DailyAmount;
 import com.poortorich.accountbook.service.AccountBookService;
 import com.poortorich.accountbook.util.AccountBookCalculator;
 import com.poortorich.chart.util.PeriodFormatter;
 import com.poortorich.global.date.constants.DateConstants;
-import com.poortorich.global.date.constants.DatePattern;
 import com.poortorich.global.date.domain.MonthInformation;
 import com.poortorich.global.date.domain.WeekInformation;
 import com.poortorich.global.date.domain.YearInformation;
 import com.poortorich.global.date.util.DateInfoProvider;
-import com.poortorich.global.date.util.DateParser;
+import com.poortorich.global.date.util.DateConverter;
 import com.poortorich.global.exceptions.BadRequestException;
 import com.poortorich.transaction.response.DailyDetailsResponse;
+import com.poortorich.transaction.response.DailyFinance;
 import com.poortorich.transaction.response.Logs;
 import com.poortorich.transaction.response.YearlyTotalResponse;
 import com.poortorich.transaction.response.MonthlyTotalResponse;
@@ -25,9 +26,11 @@ import com.poortorich.user.entity.User;
 import com.poortorich.user.service.UserService;
 import java.time.LocalDate;
 import java.time.Month;
-import java.time.format.DateTimeFormatter;
+import java.time.Year;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -45,7 +48,7 @@ public class TransactionFacade {
 
     public DailyDetailsResponse getDailyDetails(String username, String inputDate) {
         User user = userService.findUserByUsername(username);
-        LocalDate date = DateParser.parseDate(inputDate);
+        LocalDate date = DateConverter.parseDate(inputDate);
 
         List<AccountBook> dailyIncomes
                 = accountBookService.getAccountBookBetweenDates(user, date, date, AccountBookType.INCOME);
@@ -132,36 +135,59 @@ public class TransactionFacade {
         User user = userService.findUserByUsername(username);
         MonthInformation monthInfo = (MonthInformation) DateInfoProvider.get(date);
 
-        List<AccountBook> monthlyIncomes = accountBookService.getAccountBookBetweenDates(
+        List<DailyAmount> dailyIncomeAmounts = accountBookService.getDailyAmounts(
                 user, monthInfo.getStartDate(), monthInfo.getEndDate(), AccountBookType.INCOME
         );
-
-        List<AccountBook> monthlyExpenses = accountBookService.getAccountBookBetweenDates(
+        List<DailyAmount> dailyExpenseAmounts = accountBookService.getDailyAmounts(
                 user, monthInfo.getStartDate(), monthInfo.getEndDate(), AccountBookType.EXPENSE
         );
 
-        Long totalIncome = AccountBookCalculator.sum(monthlyIncomes);
-        Long totalExpense = AccountBookCalculator.sum(monthlyExpenses);
+        List<DailyFinance> dailyFinances = getTransactions(dailyIncomeAmounts, dailyExpenseAmounts);
+
+        long totalIncome = dailyFinances.stream().mapToLong(DailyFinance::getIncomeAmount).sum();
+        long totalExpense = dailyFinances.stream().mapToLong(DailyFinance::getExpenseAmount).sum();
 
         return MonthlyTotalResponse.builder()
                 .totalAmount(totalIncome - totalExpense)
                 .totalIncome(totalIncome)
                 .totalExpense(totalExpense)
-                .transactions(transactionService.getDailyFinance(monthlyIncomes, monthlyExpenses))
+                .transactions(dailyFinances)
                 .build();
+    }
+
+    private List<DailyFinance> getTransactions(List<DailyAmount> dailyIncomeAmounts, List<DailyAmount> dailyExpenseAmounts) {
+        LinkedHashMap<String, DailyFinance> dailyFinances = new LinkedHashMap<>();
+
+        addTransactionsToMap(dailyFinances, dailyIncomeAmounts, true);
+        addTransactionsToMap(dailyFinances, dailyExpenseAmounts, false);
+
+        return dailyFinances.values().stream()
+                .toList();
+    }
+
+    private void addTransactionsToMap(Map<String, DailyFinance> map, List<DailyAmount> dailyAmounts, boolean isIncome) {
+        for (DailyAmount dailyAmount : dailyAmounts) {
+            String date = dailyAmount.date().toString();
+            long amount = dailyAmount.amount();
+
+            map.merge(date,
+                    DailyFinance.builder()
+                            .date(date)
+                            .incomeAmount(isIncome ? amount : 0L)
+                            .expenseAmount(isIncome ? 0L : amount)
+                            .build(),
+                    (existing, newOne) -> DailyFinance.builder()
+                            .date(existing.getDate())
+                            .incomeAmount(existing.getIncomeAmount() + newOne.getIncomeAmount())
+                            .expenseAmount(existing.getExpenseAmount() + newOne.getExpenseAmount())
+                            .build()
+            );
+        }
     }
 
     public YearlyTotalResponse getYearlyTotal(String username, String date) {
         User user = userService.findUserByUsername(username);
-        YearInformation yearInfo;
-        if (date == null) {
-            MonthInformation monthInfo = (MonthInformation) DateInfoProvider.get(date);
-            yearInfo = (YearInformation) DateInfoProvider.get(
-                    monthInfo.getStartDate().format(DateTimeFormatter.ofPattern(DatePattern.YEAR_PATTERN))
-            );
-        } else {
-            yearInfo = (YearInformation) DateInfoProvider.get(date);
-        }
+        YearInformation yearInfo = getYearInformation(date);
 
         List<AccountBook> yearlyIncomes = accountBookService.getAccountBookBetweenDates(
                 user, yearInfo.getStartDate(), yearInfo.getEndDate(), AccountBookType.INCOME
@@ -180,6 +206,14 @@ public class TransactionFacade {
                 .yearTotalAmount(totalIncome - totalExpense)
                 .monthlyLogs(getMonthlyLogs(user, yearInfo))
                 .build();
+    }
+
+    private YearInformation getYearInformation(String date) {
+        if (date == null) {
+            return (YearInformation) DateInfoProvider.get(Year.now());
+        }
+
+        return (YearInformation) DateInfoProvider.get(date);
     }
 
     private List<Logs> getMonthlyLogs(User user, YearInformation yearInfo) {

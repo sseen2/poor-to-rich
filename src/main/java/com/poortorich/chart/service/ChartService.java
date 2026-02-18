@@ -1,6 +1,7 @@
 package com.poortorich.chart.service;
 
 import com.poortorich.accountbook.entity.AccountBook;
+import com.poortorich.accountbook.model.domain.PeriodAmount;
 import com.poortorich.accountbook.util.AccountBookGrouper;
 import com.poortorich.category.entity.Category;
 import com.poortorich.chart.aggregator.ChartDataAggregator;
@@ -67,5 +68,9 @@ public class ChartService {
             Map<DateInfo, List<AccountBook>> monthlyAccountBooks
     ) {
         return responseFactory.createCategoryVerticalResponse(yearInfo, accountBooks, monthlyAccountBooks);
+    }
+
+    public CategoryVerticalResponse getCategoryVertical(YearInformation yearInfo, List<PeriodAmount> monthlyTotalAmounts) {
+        return responseFactory.createCategoryVerticalResponse(yearInfo, monthlyTotalAmounts);
     }
 }

@@ -2,6 +2,8 @@ package com.poortorich.accountbook.service;
 
 import com.poortorich.accountbook.entity.AccountBook;
 import com.poortorich.accountbook.enums.AccountBookType;
+import com.poortorich.accountbook.model.domain.DailyAmount;
+import com.poortorich.accountbook.model.domain.PeriodAmount;
 import com.poortorich.accountbook.repository.AccountBookRepository;
 import com.poortorich.accountbook.request.AccountBookRequest;
 import com.poortorich.accountbook.response.AccountBookInfoResponse;
@@ -15,6 +17,7 @@ import com.poortorich.category.entity.Category;
 import com.poortorich.category.entity.enums.CategoryType;
 import com.poortorich.expense.response.enums.ExpenseResponse;
 import com.poortorich.global.date.domain.DateInfo;
+import com.poortorich.global.event.MonthlySummaryEvent;
 import com.poortorich.global.exceptions.NotFoundException;
 import com.poortorich.income.response.enums.IncomeResponse;
 import com.poortorich.iteration.entity.Iteration;
@@ -23,6 +26,7 @@ import com.poortorich.page.domain.Pagination;
 import com.poortorich.ranking.model.UserExpenseAggregate;
 import com.poortorich.user.entity.User;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.SliceImpl;
@@ -40,6 +44,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class AccountBookService {
 
+    private final ApplicationEventPublisher eventPublisher;
     private final AccountBookRepository accountBookRepository;
     private final Pagination pageProvider;
 
@@ -50,7 +55,17 @@ public class AccountBookService {
             AccountBookType type) {
         AccountBook accountBook = AccountBookBuilder.buildEntity(user, category, accountBookRequest, type);
         accountBookRepository.save(accountBook, type);
+        publishMonthlySummaryEvent(user, accountBookRequest, category);
         return accountBook;
+    }
+
+    private void publishMonthlySummaryEvent(User user, AccountBookRequest request, Category category) {
+        eventPublisher.publishEvent(new MonthlySummaryEvent(
+                user,
+                request.getCost(),
+                request.parseDate(),
+                category
+        ));
     }
 
     public List<AccountBook> createAccountBookAll(List<AccountBook> accountBooks, AccountBookType type) {
@@ -314,5 +329,21 @@ public class AccountBookService {
         }
 
         return accountBookRepository.findExpenseAggregatesByUsersInRange(users, startDate, endDate);
+    }
+
+    public Long getTotalAmount(User user, LocalDate startDate, LocalDate endDate, AccountBookType type) {
+        return accountBookRepository.getTotalAmount(user, startDate, endDate, type);
+    }
+
+    public List<DailyAmount> getDailyAmounts(User user, LocalDate startDate, LocalDate endDate, AccountBookType type) {
+        return accountBookRepository.getDailyAmounts(user, startDate, endDate, type);
+    }
+
+    public Long sumAmountByDateAndCategory(User user, Category category, DateInfo dateInfo) {
+        return accountBookRepository.sumAmountByDateAndCategory(user, category, dateInfo.getStartDate(), dateInfo.getEndDate());
+    }
+
+    public List<PeriodAmount> sumPeriodAmountsByCategory(User user, Category category, LocalDate startDate, LocalDate endDate) {
+        return accountBookRepository.sumPeriodAmountsByCategory(user, category, startDate, endDate);
     }
 }

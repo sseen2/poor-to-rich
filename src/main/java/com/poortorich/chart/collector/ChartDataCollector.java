@@ -136,4 +136,8 @@ public class ChartDataCollector {
                 context.getDateInfo().getEndDate()
         );
     }
+
+    public Long getTotalAmountByCategory(User user, Category category, DateInfo dateInfo) {
+        return accountBookService.sumAmountByDateAndCategory(user, category, dateInfo);
+    }
 }

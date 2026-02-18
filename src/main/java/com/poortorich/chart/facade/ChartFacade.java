@@ -2,6 +2,8 @@ package com.poortorich.chart.facade;
 
 import com.poortorich.accountbook.entity.AccountBook;
 import com.poortorich.accountbook.enums.AccountBookType;
+import com.poortorich.accountbook.model.domain.PeriodAmount;
+import com.poortorich.accountbook.service.AccountBookService;
 import com.poortorich.category.entity.Category;
 import com.poortorich.chart.collector.ChartDataCollector;
 import com.poortorich.chart.factory.ChartResponseFactory;
@@ -21,6 +23,7 @@ import com.poortorich.global.date.domain.DateInfo;
 import com.poortorich.global.date.domain.MonthInformation;
 import com.poortorich.global.date.domain.YearInformation;
 import com.poortorich.global.date.util.DateInfoProvider;
+import com.poortorich.stats.service.MonthlySummaryService;
 import java.time.Year;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +39,8 @@ public class ChartFacade {
     private final ChartDataCollector dataCollector;
     private final ChartPaginationHandler paginationHandler;
     private final ChartResponseFactory responseFactory;
+    private final AccountBookService accountBookService;
+    private final MonthlySummaryService summaryService;
 
     public TotalAmountAndSavingResponse getTotalAccountBookAmountAndSaving(
             String username, String date, AccountBookType type
@@ -103,7 +108,7 @@ public class ChartFacade {
         return chartService.getCategoryLine(monthInfo, accountBooks, weeklyAccountBooks);
     }
 
-    public CategoryVerticalResponse getCategoryVertical(String username, Long categoryId, String date) {
+    public CategoryVerticalResponse getCategoryVertical_pev(String username, Long categoryId, String date) {
         if (date == null) {
             date = Year.now().toString();
         }
@@ -118,5 +123,41 @@ public class ChartFacade {
                 dataCollector.getMonthlyAccountBooks(context.getUser(), context.getCategory(), yearInfo);
 
         return chartService.getCategoryVertical(yearInfo, accountBooks, monthlyAccountBooks);
+    }
+
+    public CategoryVerticalResponse getCategoryVertical_query(String username, Long categoryId, String date) {
+        if (date == null) {
+            date = Year.now().toString();
+        }
+
+        ChartDataContext context = dataCollector.collectCategoryContext(username, categoryId, date);
+        YearInformation yearInfo = (YearInformation) context.getDateInfo();
+
+        List<PeriodAmount> monthlyTotalAmounts = accountBookService.sumPeriodAmountsByCategory(
+                context.getUser(),
+                context.getCategory(),
+                yearInfo.getStartDate(),
+                yearInfo.getEndDate()
+        );
+
+        return chartService.getCategoryVertical(yearInfo, monthlyTotalAmounts);
+    }
+
+    public CategoryVerticalResponse getCategoryVertical_stats(String username, Long categoryId, String date) {
+        if (date == null) {
+            date = Year.now().toString();
+        }
+
+        ChartDataContext context = dataCollector.collectCategoryContext(username, categoryId, date);
+        YearInformation yearInfo = (YearInformation) context.getDateInfo();
+
+        List<PeriodAmount> monthlyTotalAmounts = summaryService.getPeriodAmounts(
+                context.getUser(),
+                context.getCategory(),
+                yearInfo.getStartDate(),
+                yearInfo.getEndDate()
+        );
+
+        return chartService.getCategoryVertical(yearInfo, monthlyTotalAmounts);
     }
 }
