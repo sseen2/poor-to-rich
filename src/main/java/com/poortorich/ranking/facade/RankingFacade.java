@@ -10,7 +10,7 @@ import com.poortorich.chat.service.ChatParticipantService;
 import com.poortorich.chat.service.ChatroomService;
 import com.poortorich.chat.util.mapper.ParticipantProfileMapper;
 import com.poortorich.chat.validator.ChatParticipantValidator;
-import com.poortorich.global.date.util.DateParser;
+import com.poortorich.global.date.util.DateConverter;
 import com.poortorich.ranking.entity.Ranking;
 import com.poortorich.ranking.model.Rankers;
 import com.poortorich.ranking.payload.response.RankingResponsePayload;
@@ -151,7 +151,7 @@ public class RankingFacade {
     }
 
     private Map<LocalDate, Ranking> getMondayRankings(Chatroom chatroom, String cursor) {
-        List<LocalDate> mondays = getMondays(DateParser.parseDate(cursor).atStartOfDay(), getFloorMonday(chatroom));
+        List<LocalDate> mondays = getMondays(DateConverter.parseDate(cursor).atStartOfDay(), getFloorMonday(chatroom));
         if (mondays.isEmpty()) {
             return new LinkedHashMap<>();
         }

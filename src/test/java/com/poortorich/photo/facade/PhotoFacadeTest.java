@@ -4,7 +4,7 @@ import com.poortorich.chat.entity.Chatroom;
 import com.poortorich.chat.response.enums.ChatResponse;
 import com.poortorich.chat.service.ChatroomService;
 import com.poortorich.chat.validator.ChatParticipantValidator;
-import com.poortorich.global.date.util.DateParser;
+import com.poortorich.global.date.util.DateConverter;
 import com.poortorich.global.exceptions.BadRequestException;
 import com.poortorich.photo.entity.Photo;
 import com.poortorich.photo.request.PhotoUploadRequest;
@@ -181,7 +181,7 @@ class PhotoFacadeTest {
         String username = "test";
         Long chatroomId = 1L;
         String dateString = "20250826010000";
-        LocalDateTime date = DateParser.parseDateTime(dateString);
+        LocalDateTime date = DateConverter.parseDateTime(dateString);
         Long photoId = 99L;
         Pageable pageable = PageRequest.of(0, 20);
         User user = User.builder().username(username).build();
@@ -233,7 +233,7 @@ class PhotoFacadeTest {
         String username = "test";
         Long chatroomId = 1L;
         String dateString = "20250826010000";
-        LocalDateTime date = DateParser.parseDateTime(dateString);
+        LocalDateTime date = DateConverter.parseDateTime(dateString);
         Long photoId = 99L;
         Pageable pageable = PageRequest.of(0, 20);
         User user = User.builder().username(username).build();

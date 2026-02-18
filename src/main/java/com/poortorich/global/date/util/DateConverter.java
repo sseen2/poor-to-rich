@@ -6,10 +6,11 @@ import com.poortorich.global.exceptions.BadRequestException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 
-public class DateParser {
+public class DateConverter {
 
     public static LocalDate parseDate(String date) {
         if (date == null || date.isBlank()) {
@@ -35,5 +36,13 @@ public class DateParser {
         } catch (DateTimeParseException e) {
             throw new BadRequestException(DateResponse.UNSUPPORTED_DATE_FORMAT);
         }
+    }
+
+    public static String formatToYearMonth(LocalDate date) {
+        return date.format(DateTimeFormatter.ofPattern(DatePattern.YEAR_MONTH_PATTERN));
+    }
+
+    public static String formatToYearMonth(YearMonth date) {
+        return date.format(DateTimeFormatter.ofPattern(DatePattern.YEAR_MONTH_PATTERN));
     }
 }

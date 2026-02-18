@@ -4,7 +4,7 @@ import com.poortorich.chat.entity.Chatroom;
 import com.poortorich.chat.service.ChatroomService;
 import com.poortorich.chat.validator.ChatParticipantValidator;
 import com.poortorich.global.date.constants.DatePattern;
-import com.poortorich.global.date.util.DateParser;
+import com.poortorich.global.date.util.DateConverter;
 import com.poortorich.global.exceptions.BadRequestException;
 import com.poortorich.photo.entity.Photo;
 import com.poortorich.photo.request.PhotoUploadRequest;
@@ -75,7 +75,7 @@ public class PhotoFacade {
         Chatroom chatroom = chatroomService.findById(chatroomId);
         chatParticipantValidator.validateIsParticipate(user, chatroom);
 
-        LocalDateTime cursorDate = DateParser.parseDateTime(date);
+        LocalDateTime cursorDate = DateConverter.parseDateTime(date);
         Pageable pageable = PageRequest.of(0, 20);
         Slice<Photo> photos = photoService.getAllPhotosByCursor(chatroom, cursorDate, id, pageable);
 
