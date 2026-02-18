@@ -74,7 +74,7 @@ public class Income implements AccountBook {
     @JoinColumn(name = "user_id")
     private User user;
 
-    @OneToOne(mappedBy = "generatedIncome")
+    @OneToOne(mappedBy = "generatedIncome", fetch = FetchType.LAZY)
     private IterationIncomes generatedIterationIncomes;
 
     @CreationTimestamp

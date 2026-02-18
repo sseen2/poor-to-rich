@@ -79,7 +79,7 @@ public class Expense implements AccountBook {
     @JoinColumn(name = "user_id")
     private User user;
 
-    @OneToOne(mappedBy = "generatedExpense")
+    @OneToOne(mappedBy = "generatedExpense", fetch = FetchType.LAZY)
     private IterationExpenses generatedIterationExpenses;
 
     @CreationTimestamp
