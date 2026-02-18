@@ -12,6 +12,16 @@ services:
     volumes:
       - mariadb_data:/var/lib/mysql
 
+  mysqld-exporter:
+    image: prom/mysqld-exporter
+    container_name: poor_to_rich_mysqld_exporter
+    volumes:
+      - ./mysqld-exporter.cnf:/.my.cnf
+    ports:
+      - "9104:9104"
+    depends_on:
+      - db
+
   redis:
     image: redis:alpine
     container_name: poor_to_rich_redis
@@ -19,6 +29,16 @@ services:
       - "${REDIS_BINDING_PORT:-6379}:${REDIS_PORT}"
     volumes:
       - redis_data:/var/lib/redis
+
+  redis-exporter:
+    image: oliver006/redis_exporter
+    container_name: poor_to_rich_redis_exporter
+    environment:
+      - REDIS_ADDR=redis:6379
+    ports:
+      - "9121:9121"
+    depends_on:
+      - redis
 
   prometheus:
     image: prom/prometheus
@@ -29,6 +49,9 @@ services:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
+    depends_on:
+      - redis-exporter
+      - mysqld-exporter
 
   grafana:
     image: grafana/grafana

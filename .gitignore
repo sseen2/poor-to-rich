@@ -38,3 +38,4 @@ out/
 
 ### security ###
 .env
+mysqld-exporter.cnf
