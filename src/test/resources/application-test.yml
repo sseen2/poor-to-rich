@@ -1,0 +1,105 @@
+spring:
+  application:
+    name: PoorToRich-Test
+
+  datasource:
+    driver-class-name: org.mariadb.jdbc.Driver
+    url: jdbc:mariadb://localhost:3306/poor_to_rich?serverTimezone=Asia/Seoul&rewriteBatchedStatements=true
+    username: # DB 계정
+    password: # DB 비밀번호
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      idle-timeout: 30000
+      connection-timeout: 30000
+      max-lifetime: 1800000
+
+  jpa:
+    database-platform: org.hibernate.dialect.MariaDBDialect
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+        default_batch_fetch_size: 1000
+    hibernate:
+      ddl-auto: update
+
+# 더미 데이터
+  redis:
+    host: localhost
+    port: 6379
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: dummy@gmail.com
+    password: dummy_password
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+  security:
+    oauth2:
+      client:
+        registration:
+          kakao:
+            client-authentication-method: client_secret_post
+            client-name: Kakao
+            client-id: dummy_kakao_client_id
+            client-secret: dummy_kakao_client_secret
+            redirect-uri: https://api.poortorich.site/login/oauth2/code/kakao
+            authorization-grant-type: authorization_code
+            scope:
+              - profile_nickname
+              - profile_image
+              - account_email
+        provider:
+          kakao:
+            authorization-uri: https://kauth.kakao.com/oauth/authorize
+            token-uri: https://kauth.kakao.com/oauth/token
+            user-info-uri: https://kapi.kakao.com/v2/user/me
+            user-name-attribute: id
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-components: always
+
+cloud:
+  aws:
+    s3:
+      bucket: dummy_bucket
+    stack:
+      auto: false
+    region:
+      static: ap-northeast-2
+    credentials:
+      accessKey: dummy_access_key
+      secretKey: dummy_secret_key
+
+  auth-code-expiration-millis: 600000
+
+jwt:
+  secret:
+    key: this_is_dummy_secret_key_for_test_environment_make_it_long_enough
+
+kakao:
+  admin:
+    key: dummy_admin_key
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE

@@ -17,6 +17,7 @@ import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.DynamicUpdate;
@@ -27,11 +28,13 @@ import java.time.LocalDateTime;
 
 @Entity
 @Getter
+@Setter
 @SuperBuilder
 @DynamicUpdate
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+//@Inheritance(strategy = InheritanceType.JOINED)
 @DiscriminatorColumn(name = "iteration_type", discriminatorType = DiscriminatorType.STRING)
 @Table(name = "iteration_info")
 public class IterationInfo {
