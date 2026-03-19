@@ -14,34 +14,37 @@ import java.util.List;
 @RequiredArgsConstructor
 public class RedisChatRepository {
 
-    private static final String REDIS_CHAT_KEY = "chatrooms:list:%s:ids";
-    private static final String REDIS_LAST_MESSAGE_TIME_KEY = "chatrooms:list:%s:times";
+    // 최신 스냅샷 버전 확인용 키
+    private static final String REDIS_CURRENT_VERSION_KEY = "chatrooms:current_version";
+
+    private static final String REDIS_CHAT_KEY = "chatrooms:sort:%s:version:%d:ids";
+    private static final String REDIS_LAST_MESSAGE_TIME_KEY = "chatrooms:sort:%s:version:%d:times";
+
     private static final int CHAT_KEY_EXPIRATION_TIME = 5;
 
     private final RedisTemplate<String, String> redisTemplate;
 
-    public void overwrite(SortBy sortBy, List<Long> chatroomIds, List<String> lastMessageTimes) {
+    public Long getCurrentVersion() {
+        String version = redisTemplate.opsForValue().get(REDIS_CURRENT_VERSION_KEY);
+
+        if (version == null) {
+            return -1L;
+        }
+
+        return Long.parseLong(version);
+    }
+
+    public void saveNewVersion(SortBy sortBy, List<Long> chatroomIds, List<String> lastMessageTimes, Long newVersion) {
         if (chatroomIds == null || lastMessageTimes == null) {
             return;
         }
 
-        deleteAll(sortBy);
-
-        save(sortBy, chatroomIds, lastMessageTimes);
+        save(sortBy, chatroomIds, lastMessageTimes, newVersion);
     }
 
-    private void deleteAll(SortBy sortBy) {
-        String idsKey = getRedisIdsKey(sortBy.name());
-        String timesKey = getRedisTimesKey(sortBy.name());
-
-        redisTemplate.delete(idsKey);
-        redisTemplate.delete(timesKey);
-
-    }
-
-    public void save(SortBy sortBy, List<Long> chatroomIds, List<String> lastMessageTimes) {
-        String idsKey = getRedisIdsKey(sortBy.name());
-        String timesKey = getRedisTimesKey(sortBy.name());
+    private void save(SortBy sortBy, List<Long> chatroomIds, List<String> lastMessageTimes, Long version) {
+        String idsKey = getRedisIdsKey(sortBy.name(), version);
+        String timesKey = getRedisTimesKey(sortBy.name(), version);
 
         List<String> stringIds = chatroomIds.stream()
                 .map(String::valueOf)
@@ -54,8 +57,12 @@ public class RedisChatRepository {
         redisTemplate.expire(timesKey, Duration.ofMinutes(CHAT_KEY_EXPIRATION_TIME));
     }
 
-    public List<Long> getChatroomIds(SortBy sortBy, Long cursor, int size) {
-        String key = getRedisIdsKey(sortBy.name());
+    public void updateCurrentVersion(Long version) {
+        redisTemplate.opsForValue().set(REDIS_CURRENT_VERSION_KEY, String.valueOf(version));
+    }
+
+    public List<Long> getChatroomIds(SortBy sortBy, Long cursor, Long version, int size) {
+        String key = getRedisIdsKey(sortBy.name(), version);
         List<String> allIds = redisTemplate.opsForList().range(key, 0, -1);
         if (allIds == null || allIds.isEmpty()) {
             return List.of();
@@ -74,9 +81,9 @@ public class RedisChatRepository {
                 .toList();
     }
 
-    public List<String> getLastMessageTimes(SortBy sortBy, Long cursor, int size) {
-        String idKey = getRedisIdsKey(sortBy.name());
-        String timeKey = getRedisTimesKey(sortBy.name());
+    public List<String> getLastMessageTimes(SortBy sortBy, Long cursor, Long version, int size) {
+        String idKey = getRedisIdsKey(sortBy.name(), version);
+        String timeKey = getRedisTimesKey(sortBy.name(), version);
 
         List<String> allIds = redisTemplate.opsForList().range(idKey, 0, -1);
         List<String> allTimes = redisTemplate.opsForList().range(timeKey, 0, -1);
@@ -93,13 +100,13 @@ public class RedisChatRepository {
         return allTimes.subList(startIndex, Math.min(startIndex + size, allTimes.size()));
     }
 
-    public boolean existsBySortBy(SortBy sortBy) {
-        String key = getRedisIdsKey(sortBy.name());
+    public boolean existsBySortBy(SortBy sortBy, Long version) {
+        String key = getRedisIdsKey(sortBy.name(), version);
         return redisTemplate.hasKey(key);
     }
 
-    public Boolean hasNext(SortBy sortBy, Long lastChatroomId) {
-        List<String> stringIds = getAllList(sortBy);
+    public Boolean hasNext(SortBy sortBy, Long lastChatroomId, Long version) {
+        List<String> stringIds = getAllList(sortBy, version);
         if (stringIds == null || stringIds.isEmpty()) {
             return false;
         }
@@ -108,8 +115,8 @@ public class RedisChatRepository {
         return hasNext(idx, stringIds.size());
     }
 
-    public Long getNextCursor(SortBy sortBy, Long lastChatroomId) {
-        List<String> stringIds = getAllList(sortBy);
+    public Long getNextCursor(SortBy sortBy, Long lastChatroomId, Long version) {
+        List<String> stringIds = getAllList(sortBy, version);
         if (stringIds == null || stringIds.isEmpty()) {
             return null;
         }
@@ -122,8 +129,8 @@ public class RedisChatRepository {
         return null;
     }
 
-    private List<String> getAllList(SortBy sortBy) {
-        String key = getRedisIdsKey(sortBy.name());
+    private List<String> getAllList(SortBy sortBy, Long version) {
+        String key = getRedisIdsKey(sortBy.name(), version);
         return redisTemplate.opsForList().range(key, 0, -1);
     }
 
@@ -131,11 +138,11 @@ public class RedisChatRepository {
         return idx != -1 && idx + 1 < size;
     }
 
-    private String getRedisIdsKey(String sortBy) {
-        return String.format(REDIS_CHAT_KEY, sortBy);
+    private String getRedisIdsKey(String sortBy, Long version) {
+        return String.format(REDIS_CHAT_KEY, sortBy, version);
     }
 
-    private String getRedisTimesKey(String sortBy) {
-        return String.format(REDIS_LAST_MESSAGE_TIME_KEY, sortBy);
+    private String getRedisTimesKey(String sortBy, Long version) {
+        return String.format(REDIS_LAST_MESSAGE_TIME_KEY, sortBy, version);
     }
 }

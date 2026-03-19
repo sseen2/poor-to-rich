@@ -61,8 +61,6 @@ import com.poortorich.user.entity.User;
 import com.poortorich.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -114,7 +112,7 @@ public class ChatFacade {
 
         realTimeFacade.createChatroom(username, chatroom.getId(), request.getIsRankingEnabled());
 
-        chatroomService.overwriteChatroomsInRedis();
+        chatroomService.saveNewVersionChatroomsInRedis();
 
         return ChatroomCreateResponse.builder().newChatroomId(chatroom.getId()).build();
     }
@@ -126,17 +124,20 @@ public class ChatFacade {
         return chatBuilder.buildChatroomInfoResponse(chatroom, hashtags);
     }
 
-    public AllChatroomsResponse getAllChatrooms(SortBy sortBy, Long cursor) {
-        List<Chatroom> chatrooms = chatroomService.getAllChatrooms(sortBy, cursor);
-        List<String> lastMessageTimes = chatroomService.getAllLastMessageTimes(sortBy, cursor);
+    public AllChatroomsResponse getAllChatrooms(SortBy sortBy, Long cursor, Long version) {
+        version = chatroomService.getVersion(version);
+
+        List<Chatroom> chatrooms = chatroomService.getAllChatrooms(sortBy, cursor, version);
+        List<String> lastMessageTimes = chatroomService.getAllLastMessageTimes(sortBy, cursor, version);
 
         if (chatrooms.isEmpty()) {
             return getAllChatroomsResponseEmptyChatroom();
         }
 
         return AllChatroomsResponse.builder()
-                .hasNext(chatroomService.hasNext(sortBy, chatrooms.getLast().getId()))
-                .nextCursor(chatroomService.getNextCursor(sortBy, chatrooms.getLast().getId()))
+                .hasNext(chatroomService.hasNext(sortBy, chatrooms.getLast().getId(), version))
+                .nextCursor(chatroomService.getNextCursor(sortBy, chatrooms.getLast().getId(), version))
+                .version(version)
                 .chatrooms(getChatroomResponses(chatrooms, lastMessageTimes))
                 .build();
     }

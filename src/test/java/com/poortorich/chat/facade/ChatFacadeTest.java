@@ -217,16 +217,17 @@ class ChatFacadeTest {
     void getAllChatroomsSuccess() {
         SortBy sortBy = SortBy.UPDATED_AT;
         Long cursor = -1L;
+        Long version = 1000000L;
 
         Chatroom chatroom1 = Chatroom.builder().id(1L).build();
         Chatroom chatroom2 = Chatroom.builder().id(2L).build();
 
-        when(chatroomService.getAllChatrooms(sortBy, cursor)).thenReturn(List.of(chatroom1, chatroom2));
+        when(chatroomService.getAllChatrooms(sortBy, cursor, version)).thenReturn(List.of(chatroom1, chatroom2));
         when(chatroomService.hasNext(sortBy, 2L)).thenReturn(true);
         when(chatroomService.getNextCursor(sortBy, 2L)).thenReturn(3L);
         when(tagService.getTagNames(any())).thenReturn(hashtags);
         when(chatParticipantService.countByChatroom(any())).thenReturn(3L);
-        when(chatroomService.getAllLastMessageTimes(sortBy, cursor)).thenReturn(List.of("", "2025-07-31T02:30"));
+        when(chatroomService.getAllLastMessageTimes(sortBy, cursor, version)).thenReturn(List.of("", "2025-07-31T02:30"));
         when(chatBuilder.buildChatroomResponse(chatroom1, hashtags, 3L, ""))
                 .thenReturn(ChatroomResponse.builder()
                         .chatroomId(chatroom1.getId())
@@ -250,7 +251,7 @@ class ChatFacadeTest {
                         .maxMemberCount(chatroom2.getMaxMemberCount())
                         .lastMessageTime("2025-07-31T02:30")
                         .build());
-        AllChatroomsResponse response = chatFacade.getAllChatrooms(sortBy, cursor);
+        AllChatroomsResponse response = chatFacade.getAllChatrooms(sortBy, cursor, version);
 
         assertThat(response.getChatrooms()).hasSize(2);
         assertThat(response.getHasNext()).isTrue();

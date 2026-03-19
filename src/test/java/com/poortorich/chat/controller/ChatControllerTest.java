@@ -97,8 +97,9 @@ public class ChatControllerTest extends BaseSecurityTest {
     void getAllChatroomsSortByUpdatedAtSuccess() throws Exception {
         SortBy sortBy = SortBy.UPDATED_AT;
         Long cursor = -1L;
+        Long version = 10000000L;
 
-        when(chatFacade.getAllChatrooms(eq(sortBy), eq(cursor)))
+        when(chatFacade.getAllChatrooms(eq(sortBy), eq(cursor), eq(version)))
                 .thenReturn(AllChatroomsResponse.builder().build());
 
         String message = sortBy.getMessage() + ChatResponseMessage.GET_ALL_CHATROOMS_SUCCESS;
@@ -116,8 +117,9 @@ public class ChatControllerTest extends BaseSecurityTest {
     void getAllChatroomsSortByCreatedAtSuccess() throws Exception {
         SortBy sortBy = SortBy.CREATED_AT;
         Long cursor = -1L;
+        Long version = 10000000L;
 
-        when(chatFacade.getAllChatrooms(eq(sortBy), eq(cursor)))
+        when(chatFacade.getAllChatrooms(eq(sortBy), eq(cursor), eq(version)))
                 .thenReturn(AllChatroomsResponse.builder().build());
 
         String message = sortBy.getMessage() + ChatResponseMessage.GET_ALL_CHATROOMS_SUCCESS;
@@ -135,8 +137,9 @@ public class ChatControllerTest extends BaseSecurityTest {
     void getAllChatroomsSortByLikeSuccess() throws Exception {
         SortBy sortBy = SortBy.LIKE;
         Long cursor = -1L;
+        Long version = 10000000L;
 
-        when(chatFacade.getAllChatrooms(eq(sortBy), eq(cursor)))
+        when(chatFacade.getAllChatrooms(eq(sortBy), eq(cursor), eq(version)))
                 .thenReturn(AllChatroomsResponse.builder().build());
 
         String message = sortBy.getMessage() + ChatResponseMessage.GET_ALL_CHATROOMS_SUCCESS;

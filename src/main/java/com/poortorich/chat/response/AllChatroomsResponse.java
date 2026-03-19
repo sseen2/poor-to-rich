@@ -15,5 +15,6 @@ public class AllChatroomsResponse {
 
     private Boolean hasNext;
     private Long nextCursor;
+    private Long version;
     private List<ChatroomResponse> chatrooms;
 }

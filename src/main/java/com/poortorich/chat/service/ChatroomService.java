@@ -11,8 +11,6 @@ import com.poortorich.chat.util.ChatBuilder;
 import com.poortorich.global.exceptions.NotFoundException;
 import com.poortorich.user.entity.User;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -36,57 +34,58 @@ public class ChatroomService {
         return chatroomRepository.save(chatroom);
     }
 
-    public void overwriteChatroomsInRedis() {
+    public void saveNewVersionChatroomsInRedis() {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    overwriteInRedis();
+                    saveNewVersion();
                 }
             });
         } else {
-            overwriteInRedis();
+            saveNewVersion();
         }
     }
 
-    private void overwriteInRedis() {
-        overwriteChatroomsInRedisBySortBy(SortBy.UPDATED_AT);
-        overwriteChatroomsInRedisBySortBy(SortBy.LIKE);
-        overwriteChatroomsInRedisBySortBy(SortBy.CREATED_AT);
+    public Long getVersion(Long version) {
+        if (version == -1L) {
+            version = redisChatRepository.getCurrentVersion();
+        }
+
+        return version;
     }
 
-    private void overwriteChatroomsInRedisBySortBy(SortBy sortBy) {
+    public List<Chatroom> getAllChatrooms(SortBy sortBy, Long cursor, Long version) {
+        if (redisChatRepository.existsBySortBy(sortBy, version)) {
+            return findByIds(redisChatRepository.getChatroomIds(sortBy, cursor, version, 20));
+        }
+
+        saveNewVersion();
+
+        return findByIds(redisChatRepository.getChatroomIds(sortBy, cursor, version, 20));
+    }
+
+    private void saveNewVersion() {
+        Long newVersion = System.currentTimeMillis();
+
+        saveNewVersionChatroomsInRedis(SortBy.UPDATED_AT, newVersion);
+        saveNewVersionChatroomsInRedis(SortBy.LIKE, newVersion);
+        saveNewVersionChatroomsInRedis(SortBy.CREATED_AT, newVersion);
+
+        redisChatRepository.updateCurrentVersion(newVersion);
+    }
+
+    private void saveNewVersionChatroomsInRedis(SortBy sortBy, Long newVersion) {
         List<Long> chatrooms = getChatroomIdsBySortBy(sortBy);
         List<String> lastMessageTimes = getLastMessageTimes(chatrooms);
 
         if (!chatrooms.isEmpty()) {
-            redisChatRepository.overwrite(sortBy, chatrooms, lastMessageTimes);
+            redisChatRepository.saveNewVersion(sortBy, chatrooms, lastMessageTimes, newVersion);
         }
     }
 
-    public List<Chatroom> getAllChatrooms(SortBy sortBy, Long cursor) {
-        if (redisChatRepository.existsBySortBy(sortBy)) {
-            return findByIds(redisChatRepository.getChatroomIds(sortBy, cursor, 20));
-        }
-
-        saveChatroomsInRedisBySortBy(SortBy.UPDATED_AT);
-        saveChatroomsInRedisBySortBy(SortBy.LIKE);
-        saveChatroomsInRedisBySortBy(SortBy.CREATED_AT);
-
-        return findByIds(redisChatRepository.getChatroomIds(sortBy, cursor, 20));
-    }
-
-    public List<String> getAllLastMessageTimes(SortBy sortBy, Long cursor) {
-        return redisChatRepository.getLastMessageTimes(sortBy, cursor, 20);
-    }
-
-    private void saveChatroomsInRedisBySortBy(SortBy sortBy) {
-        List<Long> chatrooms = getChatroomIdsBySortBy(sortBy);
-        List<String> lastMessageTimes = getLastMessageTimes(chatrooms);
-
-        if (!chatrooms.isEmpty()) {
-            redisChatRepository.save(sortBy, chatrooms, lastMessageTimes);
-        }
+    public List<String> getAllLastMessageTimes(SortBy sortBy, Long cursor, Long version) {
+        return redisChatRepository.getLastMessageTimes(sortBy, cursor, version, 20);
     }
 
     private List<Long> getChatroomIdsBySortBy(SortBy sortBy) {
@@ -122,12 +121,12 @@ public class ChatroomService {
         return chatrooms;
     }
 
-    public Boolean hasNext(SortBy sortBy, Long lastChatroomId) {
-        return redisChatRepository.hasNext(sortBy, lastChatroomId);
+    public Boolean hasNext(SortBy sortBy, Long lastChatroomId, Long version) {
+        return redisChatRepository.hasNext(sortBy, lastChatroomId, version);
     }
 
-    public Long getNextCursor(SortBy sortBy, Long lastChatroomId) {
-        return redisChatRepository.getNextCursor(sortBy, lastChatroomId);
+    public Long getNextCursor(SortBy sortBy, Long lastChatroomId, Long version) {
+        return redisChatRepository.getNextCursor(sortBy, lastChatroomId, version);
     }
 
     public Chatroom findById(Long chatroomId) {
