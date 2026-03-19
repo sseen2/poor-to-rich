@@ -14,7 +14,6 @@ import com.poortorich.chat.request.ChatroomUpdateRequest;
 import com.poortorich.chat.request.HostDelegationRequest;
 import com.poortorich.chat.request.enums.SortBy;
 import com.poortorich.chat.response.ChatMessagePageResponse;
-import com.poortorich.chat.response.ChatroomCreateResponse;
 import com.poortorich.chat.response.ChatroomLeaveAllResponse;
 import com.poortorich.chat.response.ChatroomLeaveResponse;
 import com.poortorich.chat.response.ChatroomUpdateResponse;
@@ -59,12 +58,10 @@ public class ChatController {
             @AuthenticationPrincipal UserDetails userDetails,
             @Valid ChatroomCreateRequest request
     ) {
-        ChatroomCreateResponse response = chatFacade.createChatroom(userDetails.getUsername(), request);
-        realTimeFacade.createDateChangeSystemMessage(response.getNewChatroomId());
-        realTimeFacade.createUserEnterSystemMessage(userDetails.getUsername(), response.getNewChatroomId());
-        realTimeFacade.createRankingStatusMessage(response.getNewChatroomId(), request.getIsRankingEnabled());
-        chatFacade.overwriteChatroomsInRedis();
-        return DataResponse.toResponseEntity(ChatResponse.CREATE_CHATROOM_SUCCESS, response);
+        return DataResponse.toResponseEntity(
+                ChatResponse.CREATE_CHATROOM_SUCCESS,
+                chatFacade.createChatroom(userDetails.getUsername(), request)
+        );
     }
 
     @GetMapping

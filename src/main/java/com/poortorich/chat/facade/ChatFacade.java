@@ -12,6 +12,7 @@ import com.poortorich.chat.realtime.event.chatparticipants.KickChatroomEvent;
 import com.poortorich.chat.realtime.event.chatroom.ChatroomUpdateEvent;
 import com.poortorich.chat.realtime.event.chatroom.ParticipantUpdateEvent;
 import com.poortorich.chat.realtime.event.chatroom.detector.ChatroomUpdateDetector;
+import com.poortorich.chat.realtime.facade.ChatRealTimeFacade;
 import com.poortorich.chat.realtime.payload.response.UserEnterProfileResponsePayload;
 import com.poortorich.chat.realtime.payload.response.enums.PayloadType;
 import com.poortorich.chat.request.ChatroomCreateRequest;
@@ -77,6 +78,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ChatFacade {
 
+    private final ChatRealTimeFacade realTimeFacade;
+
     private final UserService userService;
     private final ChatroomService chatroomService;
     private final ChatParticipantService chatParticipantService;
@@ -109,11 +112,11 @@ public class ChatFacade {
         chatParticipantService.createChatroomHost(user, chatroom);
         tagService.createTag(request.getHashtags(), chatroom);
 
-        return ChatroomCreateResponse.builder().newChatroomId(chatroom.getId()).build();
-    }
+        realTimeFacade.createChatroom(username, chatroom.getId(), request.getIsRankingEnabled());
 
-    public void overwriteChatroomsInRedis() {
         chatroomService.overwriteChatroomsInRedis();
+
+        return ChatroomCreateResponse.builder().newChatroomId(chatroom.getId()).build();
     }
 
     public ChatroomInfoResponse getChatroom(Long chatroomId) {

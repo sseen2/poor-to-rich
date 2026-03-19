@@ -60,6 +60,12 @@ public class ChatRealTimeFacade {
 
     private final ApplicationEventPublisher eventPublisher;
 
+    public void createChatroom(String username, Long newChatroomId, Boolean isRankingEnabled) {
+        createDateChangeSystemMessage(newChatroomId);
+        createUserEnterSystemMessage(username, newChatroomId);
+        createRankingStatusMessage(newChatroomId, isRankingEnabled);
+    }
+
     public BasePayload createUserEnterSystemMessage(String username, Long chatroomId) {
         User user = userService.findUserByUsername(username);
         Chatroom chatroom = chatroomService.findById(chatroomId);
