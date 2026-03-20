@@ -6,6 +6,7 @@ import com.poortorich.chat.entity.Chatroom;
 import com.poortorich.chat.entity.enums.ChatroomRole;
 import com.poortorich.chat.model.ChatMessageResponse;
 import com.poortorich.chat.model.ChatPaginationContext;
+import com.poortorich.chat.model.ChatroomContext;
 import com.poortorich.chat.model.ChatroomPaginationContext;
 import com.poortorich.chat.model.UserEnterChatroomResult;
 import com.poortorich.chat.realtime.event.chatparticipants.KickChatroomEvent;
@@ -125,10 +126,11 @@ public class ChatFacade {
     }
 
     public AllChatroomsResponse getAllChatrooms(SortBy sortBy, Long cursor, Long version) {
-        version = chatroomService.getVersion(version);
+        ChatroomContext chatroomContext = chatroomService.getAllChatrooms(sortBy, cursor, version);
 
-        List<Chatroom> chatrooms = chatroomService.getAllChatrooms(sortBy, cursor, version);
-        List<String> lastMessageTimes = chatroomService.getAllLastMessageTimes(sortBy, cursor, version);
+        List<Chatroom> chatrooms = chatroomContext.getChatrooms();
+        List<String> lastMessageTimes = chatroomContext.getLastMessageTimes();
+        version = chatroomContext.getVersion();
 
         if (chatrooms.isEmpty()) {
             return getAllChatroomsResponseEmptyChatroom();

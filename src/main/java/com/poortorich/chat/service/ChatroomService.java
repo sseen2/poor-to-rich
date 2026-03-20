@@ -2,6 +2,7 @@ package com.poortorich.chat.service;
 
 import com.poortorich.chat.entity.Chatroom;
 import com.poortorich.chat.entity.enums.ChatroomRole;
+import com.poortorich.chat.model.ChatroomContext;
 import com.poortorich.chat.repository.ChatroomRepository;
 import com.poortorich.chat.repository.RedisChatRepository;
 import com.poortorich.chat.request.ChatroomCreateRequest;
@@ -47,7 +48,19 @@ public class ChatroomService {
         }
     }
 
-    public Long getVersion(Long version) {
+    public ChatroomContext getAllChatrooms(SortBy sortBy, Long cursor, Long version) {
+        version = getVersion(version);
+
+        if (redisChatRepository.existsBySortBy(sortBy, version)) {
+            return getChatroomContext(sortBy, cursor, version);
+        }
+
+        version = saveNewVersion();
+
+        return getChatroomContext(sortBy, cursor, version);
+    }
+
+    private Long getVersion(Long version) {
         if (version == -1L) {
             version = redisChatRepository.getCurrentVersion();
         }
@@ -55,17 +68,18 @@ public class ChatroomService {
         return version;
     }
 
-    public List<Chatroom> getAllChatrooms(SortBy sortBy, Long cursor, Long version) {
-        if (redisChatRepository.existsBySortBy(sortBy, version)) {
-            return findByIds(redisChatRepository.getChatroomIds(sortBy, cursor, version, 20));
-        }
+    private ChatroomContext getChatroomContext(SortBy sortBy, Long cursor, Long version) {
+        List<Chatroom> chatrooms = findByIds(redisChatRepository.getChatroomIds(sortBy, cursor, version, 20));
+        List<String> lastMessageTimes = getAllLastMessageTimes(sortBy, cursor, version);
 
-        saveNewVersion();
-
-        return findByIds(redisChatRepository.getChatroomIds(sortBy, cursor, version, 20));
+        return ChatroomContext.builder()
+                .chatrooms(chatrooms)
+                .lastMessageTimes(lastMessageTimes)
+                .version(version)
+                .build();
     }
 
-    private void saveNewVersion() {
+    private Long saveNewVersion() {
         Long newVersion = System.currentTimeMillis();
 
         saveNewVersionChatroomsInRedis(SortBy.UPDATED_AT, newVersion);
@@ -73,6 +87,8 @@ public class ChatroomService {
         saveNewVersionChatroomsInRedis(SortBy.CREATED_AT, newVersion);
 
         redisChatRepository.updateCurrentVersion(newVersion);
+
+        return newVersion;
     }
 
     private void saveNewVersionChatroomsInRedis(SortBy sortBy, Long newVersion) {
