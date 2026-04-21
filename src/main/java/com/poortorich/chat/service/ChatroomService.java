@@ -137,7 +137,13 @@ public class ChatroomService {
         chatroomRepository.findById(chatroomId)
                 .orElseThrow(() -> new NotFoundException(ChatResponse.CHATROOM_NOT_FOUND))
                 .closeChatroom();
-        redisChatRepository.removeChatroomFromCurrentVersion(chatroomId);
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                redisChatRepository.removeChatroomFromCurrentVersion(chatroomId);
+            }
+        });
     }
 
     @Transactional
