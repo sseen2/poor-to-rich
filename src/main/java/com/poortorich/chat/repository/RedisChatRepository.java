@@ -1,25 +1,28 @@
 package com.poortorich.chat.repository;
 
+import com.poortorich.chat.model.ChatroomContext;
 import com.poortorich.chat.request.enums.SortBy;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.DefaultTypedTuple;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations.TypedTuple;
 import org.springframework.stereotype.Repository;
 
 import java.time.Duration;
-import java.util.List;
 
 @Slf4j
 @Repository
 @RequiredArgsConstructor
 public class RedisChatRepository {
 
-    // 최신 스냅샷 버전 확인용 키
     private static final String REDIS_CURRENT_VERSION_KEY = "chatrooms:current_version";
 
-    private static final String REDIS_CHAT_KEY = "chatrooms:sort:%s:version:%d:ids";
-    private static final String REDIS_LAST_MESSAGE_TIME_KEY = "chatrooms:sort:%s:version:%d:times";
-
+    private static final String REDIS_CHAT_ZSET_KEY = "chatrooms:sort:%s:version:%d:zset";
     private static final int CHAT_KEY_EXPIRATION_TIME = 5;
 
     private final RedisTemplate<String, String> redisTemplate;
@@ -43,106 +46,84 @@ public class RedisChatRepository {
     }
 
     private void save(SortBy sortBy, List<Long> chatroomIds, List<String> lastMessageTimes, Long version) {
-        String idsKey = getRedisIdsKey(sortBy.name(), version);
-        String timesKey = getRedisTimesKey(sortBy.name(), version);
+        String key = getRedisChatKey(sortBy.name(), version);
 
-        List<String> stringIds = chatroomIds.stream()
-                .map(String::valueOf)
-                .toList();
+        redisTemplate.opsForZSet().add(key, buildZset(chatroomIds, lastMessageTimes));
+        redisTemplate.expire(key, Duration.ofMinutes(CHAT_KEY_EXPIRATION_TIME));
+    }
 
-        redisTemplate.opsForList().rightPushAll(idsKey, stringIds);
-        redisTemplate.opsForList().rightPushAll(timesKey, lastMessageTimes);
-
-        redisTemplate.expire(idsKey, Duration.ofMinutes(CHAT_KEY_EXPIRATION_TIME));
-        redisTemplate.expire(timesKey, Duration.ofMinutes(CHAT_KEY_EXPIRATION_TIME));
+    private Set<TypedTuple<String>> buildZset(List<Long> chatroomIds, List<String> lastMessageTimes) {
+        Set<TypedTuple<String>> zset = new HashSet<>();
+        int size = chatroomIds.size();
+        for (int i = 0; i < size; i++) {
+            String member = chatroomIds.get(i) + ":" + lastMessageTimes.get(i);
+            zset.add(new DefaultTypedTuple<>(member, (double) (size - i)));
+        }
+        return zset;
     }
 
     public void updateCurrentVersion(Long version) {
         redisTemplate.opsForValue().set(REDIS_CURRENT_VERSION_KEY, String.valueOf(version));
     }
 
-    public List<Long> getChatroomIds(SortBy sortBy, Long cursor, Long version, int size) {
-        String key = getRedisIdsKey(sortBy.name(), version);
-        List<String> allIds = redisTemplate.opsForList().range(key, 0, -1);
-        if (allIds == null || allIds.isEmpty()) {
-            return List.of();
+    public ChatroomContext getChatroomData(SortBy sortBy, Long cursor, Long version, int size) {
+        Set<TypedTuple<String>> zset = getZset(sortBy, cursor, version, size + 1);
+
+        if (zset.isEmpty()) {
+            return ChatroomContext.builder()
+                    .chatroomIds(List.of())
+                    .lastMessageTimes(List.of())
+                    .version(null)
+                    .hasNext(false)
+                    .nextCursor(null)
+                    .build();
         }
 
-        if (cursor == 0 || cursor == -1) {
-            return allIds.subList(0, Math.min(size, allIds.size())).stream()
-                    .map(Long::parseLong)
-                    .toList();
-        }
-
-        int startIndex = allIds.indexOf(cursor.toString());
-        List<String> result = allIds.subList(startIndex, Math.min(startIndex + size, allIds.size()));
-        return result.stream()
-                .map(Long::parseLong)
-                .toList();
+        return parseChatroomContext(zset, version, size);
     }
 
-    public List<String> getLastMessageTimes(SortBy sortBy, Long cursor, Long version, int size) {
-        String idKey = getRedisIdsKey(sortBy.name(), version);
-        String timeKey = getRedisTimesKey(sortBy.name(), version);
+    private Set<TypedTuple<String>> getZset(SortBy sortBy, Long cursor, Long version, int size) {
+        String key = String.format(REDIS_CHAT_ZSET_KEY, sortBy.name(), version);
 
-        List<String> allIds = redisTemplate.opsForList().range(idKey, 0, -1);
-        List<String> allTimes = redisTemplate.opsForList().range(timeKey, 0, -1);
+        double maxScore = cursor < 0 ? Double.MAX_VALUE : cursor.doubleValue() - 0.000001;
 
-        if (allIds == null || allTimes == null || allIds.isEmpty() || allTimes.isEmpty()) {
-            return List.of();
+        Set<TypedTuple<String>> results = redisTemplate.opsForZSet()
+                .reverseRangeByScoreWithScores(key, 0.0, maxScore, 0, size);
+
+        return results == null || results.isEmpty() ? Set.of() : results;
+    }
+
+    private ChatroomContext parseChatroomContext(Set<TypedTuple<String>> zset, Long version, int size) {
+        boolean hasNext = zset.size() > size;
+
+        List<Long> ids = new ArrayList<>();
+        List<String> times = new ArrayList<>();
+        Double lastScore = null;
+        int count = 0;
+
+        for (TypedTuple<String> tuple : zset) {
+            if (count++ == size) break;
+            String[] parts = tuple.getValue().split(":", 2);
+            ids.add(Long.parseLong(parts[0]));
+            times.add(parts.length > 1 ? parts[1] : "");
+            lastScore = tuple.getScore();
         }
 
-        if (cursor == 0 || cursor == -1) {
-            return allTimes.subList(0, Math.min(size, allTimes.size()));
-        }
-
-        int startIndex = allIds.indexOf(cursor.toString());
-        return allTimes.subList(startIndex, Math.min(startIndex + size, allTimes.size()));
+        return ChatroomContext.builder()
+                .chatroomIds(ids)
+                .lastMessageTimes(times)
+                .version(version)
+                .hasNext(hasNext)
+                .nextCursor(lastScore != null ? lastScore.longValue() : null)
+                .build();
     }
 
     public boolean existsBySortBy(SortBy sortBy, Long version) {
-        String key = getRedisIdsKey(sortBy.name(), version);
+        String key = getRedisChatKey(sortBy.name(), version);
         return redisTemplate.hasKey(key);
     }
 
-    public Boolean hasNext(SortBy sortBy, Long lastChatroomId, Long version) {
-        List<String> stringIds = getAllList(sortBy, version);
-        if (stringIds == null || stringIds.isEmpty()) {
-            return false;
-        }
-
-        int idx = stringIds.indexOf(lastChatroomId.toString());
-        return hasNext(idx, stringIds.size());
-    }
-
-    public Long getNextCursor(SortBy sortBy, Long lastChatroomId, Long version) {
-        List<String> stringIds = getAllList(sortBy, version);
-        if (stringIds == null || stringIds.isEmpty()) {
-            return null;
-        }
-
-        int idx = stringIds.indexOf(lastChatroomId.toString());
-        if (hasNext(idx, stringIds.size())) {
-            return Long.parseLong(stringIds.get(idx + 1));
-        }
-
-        return null;
-    }
-
-    private List<String> getAllList(SortBy sortBy, Long version) {
-        String key = getRedisIdsKey(sortBy.name(), version);
-        return redisTemplate.opsForList().range(key, 0, -1);
-    }
-
-    private Boolean hasNext(int idx, int size) {
-        return idx != -1 && idx + 1 < size;
-    }
-
-    private String getRedisIdsKey(String sortBy, Long version) {
-        return String.format(REDIS_CHAT_KEY, sortBy, version);
-    }
-
-    private String getRedisTimesKey(String sortBy, Long version) {
-        return String.format(REDIS_LAST_MESSAGE_TIME_KEY, sortBy, version);
+    private String getRedisChatKey(String sortBy, Long version) {
+        return String.format(REDIS_CHAT_ZSET_KEY, sortBy, version);
     }
 }

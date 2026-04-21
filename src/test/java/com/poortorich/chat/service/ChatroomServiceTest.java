@@ -19,7 +19,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -215,33 +214,6 @@ class ChatroomServiceTest {
 //        assertThat(result.get(0)).isEqualTo(chatroom1);
 //        assertThat(result.get(1)).isEqualTo(chatroom2);
 //    }
-
-    @Test
-    @DisplayName("Redis 캐시에 다음 페이지가 존재하는 경우 - true 반환")
-    void hasNextTrueSuccess() {
-        SortBy sortBy = SortBy.LIKE;
-        Long lastChatroomId = 5L;
-
-        when(redisChatRepository.hasNext(sortBy, lastChatroomId)).thenReturn(true);
-
-        Boolean result = chatroomService.hasNext(sortBy, lastChatroomId);
-
-        assertThat(result).isTrue();
-    }
-
-    @Test
-    @DisplayName("Redis 캐시에서 다음 커서 값을 조회 - 커서 값 반환")
-    void getNextCursorSuccess() {
-        SortBy sortBy = SortBy.LIKE;
-        Long lastChatroomId = 5L;
-        Long expectedNextCursor = 6L;
-
-        when(redisChatRepository.getNextCursor(sortBy, lastChatroomId)).thenReturn(expectedNextCursor);
-
-        Long result = chatroomService.getNextCursor(sortBy, lastChatroomId);
-
-        assertThat(result).isEqualTo(expectedNextCursor);
-    }
 
     @Test
     @DisplayName("채팅방 검색 목록 조회 성공")

@@ -11,14 +11,13 @@ import com.poortorich.chat.response.enums.ChatResponse;
 import com.poortorich.chat.util.ChatBuilder;
 import com.poortorich.global.exceptions.NotFoundException;
 import com.poortorich.user.entity.User;
+import java.util.Comparator;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-
-import java.util.Comparator;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -51,13 +50,11 @@ public class ChatroomService {
     public ChatroomContext getAllChatrooms(SortBy sortBy, Long cursor, Long version) {
         version = getVersion(version);
 
-        if (redisChatRepository.existsBySortBy(sortBy, version)) {
-            return getChatroomContext(sortBy, cursor, version);
+        if (!redisChatRepository.existsBySortBy(sortBy, version)) {
+            version = saveNewVersion();
         }
 
-        version = saveNewVersion();
-
-        return getChatroomContext(sortBy, cursor, version);
+        return redisChatRepository.getChatroomData(sortBy, cursor, version, 20);
     }
 
     private Long getVersion(Long version) {
@@ -66,17 +63,6 @@ public class ChatroomService {
         }
 
         return version;
-    }
-
-    private ChatroomContext getChatroomContext(SortBy sortBy, Long cursor, Long version) {
-        List<Chatroom> chatrooms = findByIds(redisChatRepository.getChatroomIds(sortBy, cursor, version, 20));
-        List<String> lastMessageTimes = getAllLastMessageTimes(sortBy, cursor, version);
-
-        return ChatroomContext.builder()
-                .chatrooms(chatrooms)
-                .lastMessageTimes(lastMessageTimes)
-                .version(version)
-                .build();
     }
 
     private Long saveNewVersion() {
@@ -92,16 +78,12 @@ public class ChatroomService {
     }
 
     private void saveNewVersionChatroomsInRedis(SortBy sortBy, Long newVersion) {
-        List<Long> chatrooms = getChatroomIdsBySortBy(sortBy);
-        List<String> lastMessageTimes = getLastMessageTimes(chatrooms);
+        List<Long> chatroomIds = getChatroomIdsBySortBy(sortBy);
+        List<String> lastMessageTimes = getLastMessageTimes(chatroomIds);
 
-        if (!chatrooms.isEmpty()) {
-            redisChatRepository.saveNewVersion(sortBy, chatrooms, lastMessageTimes, newVersion);
+        if (!chatroomIds.isEmpty()) {
+            redisChatRepository.saveNewVersion(sortBy, chatroomIds, lastMessageTimes, newVersion);
         }
-    }
-
-    public List<String> getAllLastMessageTimes(SortBy sortBy, Long cursor, Long version) {
-        return redisChatRepository.getLastMessageTimes(sortBy, cursor, version, 20);
     }
 
     private List<Long> getChatroomIdsBySortBy(SortBy sortBy) {
@@ -131,18 +113,10 @@ public class ChatroomService {
         return chatroomRepository.findChatroomsByCreatedAt();
     }
 
-    private List<Chatroom> findByIds(List<Long> chatroomIds) {
+    public List<Chatroom> findByIds(List<Long> chatroomIds) {
         List<Chatroom> chatrooms = chatroomRepository.findAllByIdInAndIsClosedFalse(chatroomIds);
         chatrooms.sort(Comparator.comparingInt(c -> chatroomIds.indexOf(c.getId())));
         return chatrooms;
-    }
-
-    public Boolean hasNext(SortBy sortBy, Long lastChatroomId, Long version) {
-        return redisChatRepository.hasNext(sortBy, lastChatroomId, version);
-    }
-
-    public Long getNextCursor(SortBy sortBy, Long lastChatroomId, Long version) {
-        return redisChatRepository.getNextCursor(sortBy, lastChatroomId, version);
     }
 
     public Chatroom findById(Long chatroomId) {

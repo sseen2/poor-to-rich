@@ -128,18 +128,17 @@ public class ChatFacade {
     public AllChatroomsResponse getAllChatrooms(SortBy sortBy, Long cursor, Long version) {
         ChatroomContext chatroomContext = chatroomService.getAllChatrooms(sortBy, cursor, version);
 
-        List<Chatroom> chatrooms = chatroomContext.getChatrooms();
-        List<String> lastMessageTimes = chatroomContext.getLastMessageTimes();
-        version = chatroomContext.getVersion();
-
-        if (chatrooms.isEmpty()) {
+        if (chatroomContext.isEmpty()) {
             return getAllChatroomsResponseEmptyChatroom();
         }
 
+        List<Chatroom> chatrooms = chatroomService.findByIds(chatroomContext.getChatroomIds());
+        List<String> lastMessageTimes = chatroomContext.getLastMessageTimes();
+
         return AllChatroomsResponse.builder()
-                .hasNext(chatroomService.hasNext(sortBy, chatrooms.getLast().getId(), version))
-                .nextCursor(chatroomService.getNextCursor(sortBy, chatrooms.getLast().getId(), version))
-                .version(version)
+                .hasNext(chatroomContext.getHasNext())
+                .nextCursor(chatroomContext.getNextCursor())
+                .version(chatroomContext.getVersion())
                 .chatrooms(getChatroomResponses(chatrooms, lastMessageTimes))
                 .build();
     }
