@@ -13,6 +13,7 @@ import com.poortorich.global.exceptions.NotFoundException;
 import com.poortorich.user.entity.User;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -78,27 +79,18 @@ public class ChatroomService {
     }
 
     private void saveNewVersionChatroomsInRedis(SortBy sortBy, Long newVersion) {
-        List<Long> chatroomIds = getChatroomIdsBySortBy(sortBy);
-        List<String> lastMessageTimes = getLastMessageTimes(chatroomIds);
-
-        if (!chatroomIds.isEmpty()) {
-            redisChatRepository.saveNewVersion(sortBy, chatroomIds, lastMessageTimes, newVersion);
+        List<Chatroom> chatrooms = getBySortBy(sortBy);
+        if (chatrooms.isEmpty()) {
+            return;
         }
-    }
 
-    private List<Long> getChatroomIdsBySortBy(SortBy sortBy) {
-        return getBySortBy(sortBy).stream()
-                .map(Chatroom::getId)
+        List<Long> chatroomIds = chatrooms.stream().map(Chatroom::getId).toList();
+        Map<Long, String> lastMessageTimeMap = chatMessageService.getLastMessageTimesByChatroomIds(chatroomIds);
+        List<String> lastMessageTimes = chatroomIds.stream()
+                .map(id -> lastMessageTimeMap.getOrDefault(id, ""))
                 .toList();
-    }
 
-    private List<String> getLastMessageTimes(List<Long> chatroomIds) {
-        return chatroomIds.stream()
-                .map(chatroomId -> {
-                    Chatroom chatroom = findById(chatroomId);
-                    return chatMessageService.getLastMessageTime(chatroom);
-                })
-                .toList();
+        redisChatRepository.saveNewVersion(sortBy, chatroomIds, lastMessageTimes, newVersion);
     }
 
     private List<Chatroom> getBySortBy(SortBy sortBy) {

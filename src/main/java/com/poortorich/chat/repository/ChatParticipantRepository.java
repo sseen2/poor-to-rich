@@ -51,6 +51,16 @@ public interface ChatParticipantRepository extends JpaRepository<ChatParticipant
     Long countParticipantsByChatroom(@Param("chatroom") Chatroom chatroom);
 
     @Query("""
+            SELECT cp.chatroom.id, COUNT(cp)
+            FROM ChatParticipant cp
+            WHERE cp.chatroom.id IN :chatroomIds
+            AND cp.isParticipated = true
+            AND cp.role <> 'BANNED'
+            GROUP BY cp.chatroom.id
+            """)
+    List<Object[]> countParticipantsByChatroomIds(@Param("chatroomIds") List<Long> chatroomIds);
+
+    @Query("""
             SELECT cp
             FROM ChatParticipant cp
             WHERE cp.chatroom = :chatroom

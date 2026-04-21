@@ -38,6 +38,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -93,6 +94,16 @@ public class ChatMessageService {
                         chatroom, List.of(ChatMessageType.CHAT_MESSAGE, ChatMessageType.RANKING_MESSAGE))
                 .map(chatMessage -> chatMessage.getSentAt().toString())
                 .orElse("");
+    }
+
+    public Map<Long, String> getLastMessageTimesByChatroomIds(List<Long> chatroomIds) {
+        return chatMessageRepository.findLastMessageTimesByChatroomIds(
+                        chatroomIds, List.of(ChatMessageType.CHAT_MESSAGE, ChatMessageType.RANKING_MESSAGE))
+                .stream()
+                .collect(Collectors.toMap(
+                        result -> (Long) result[0],
+                        result -> ((LocalDateTime) result[1]).toString()
+                ));
     }
 
     @Transactional

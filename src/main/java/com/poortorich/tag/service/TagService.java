@@ -8,7 +8,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -39,6 +41,14 @@ public class TagService {
         return tagRepository.findByChatroom(chatroom).stream()
                 .map(Tag::getName)
                 .toList();
+    }
+
+    public Map<Long, List<String>> getTagNamesByChatroomIds(List<Long> chatroomIds) {
+        return tagRepository.findByChatroomIds(chatroomIds).stream()
+                .collect(Collectors.groupingBy(
+                        tag -> tag.getChatroom().getId(),
+                        Collectors.mapping(Tag::getName, Collectors.toList())
+                ));
     }
 
     @Transactional

@@ -70,6 +70,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -144,15 +145,20 @@ public class ChatFacade {
     }
 
     private List<ChatroomResponse> getChatroomResponses(List<Chatroom> chatrooms, List<String> lastMessageTimes) {
+        List<Long> chatroomIds = chatrooms.stream().map(Chatroom::getId).toList();
+        Map<Long, List<String>> tagMap = tagService.getTagNamesByChatroomIds(chatroomIds);
+        Map<Long, Long> participantCountMap = chatParticipantService.countByChatroomIds(chatroomIds);
+
         List<ChatroomResponse> chatroomResponses = new ArrayList<>();
         for (int i = 0; i < chatrooms.size(); i++) {
             Chatroom chatroom = chatrooms.get(i);
+            Long chatroomId = chatroom.getId();
 
             chatroomResponses.add(
                     chatBuilder.buildChatroomResponse(
                             chatroom,
-                            tagService.getTagNames(chatroom),
-                            chatParticipantService.countByChatroom(chatroom),
+                            tagMap.getOrDefault(chatroomId, List.of()),
+                            participantCountMap.getOrDefault(chatroomId, 0L),
                             lastMessageTimes.get(i))
             );
         }
@@ -186,15 +192,22 @@ public class ChatFacade {
     }
 
     private List<ChatroomResponse> getChatroomResponses(List<Chatroom> chatrooms) {
+        List<Long> chatroomIds = chatrooms.stream().map(Chatroom::getId).toList();
+        Map<Long, List<String>> tagMap = tagService.getTagNamesByChatroomIds(chatroomIds);
+        Map<Long, Long> participantCountMap = chatParticipantService.countByChatroomIds(chatroomIds);
+        Map<Long, String> lastMessageTimeMap = chatMessageService.getLastMessageTimesByChatroomIds(chatroomIds);
+
         return chatrooms.stream()
                 .filter(Objects::nonNull)
-                .map(chatroom ->
-                        chatBuilder.buildChatroomResponse(
-                                chatroom,
-                                tagService.getTagNames(chatroom),
-                                chatParticipantService.countByChatroom(chatroom),
-                                chatMessageService.getLastMessageTime(chatroom)
-                        ))
+                .map(chatroom -> {
+                    Long chatroomId = chatroom.getId();
+                    return chatBuilder.buildChatroomResponse(
+                            chatroom,
+                            tagMap.getOrDefault(chatroomId, List.of()),
+                            participantCountMap.getOrDefault(chatroomId, 0L),
+                            lastMessageTimeMap.getOrDefault(chatroomId, "")
+                    );
+                })
                 .toList();
     }
 

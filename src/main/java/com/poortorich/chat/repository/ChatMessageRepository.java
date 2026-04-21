@@ -108,6 +108,17 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             """)
     Long findLatestMessageIdByChatroom(Chatroom chatroom);
 
+    @Query("""
+            SELECT m.chatroom.id, MAX(m.sentAt)
+            FROM ChatMessage m
+            WHERE m.chatroom.id IN :chatroomIds
+              AND m.type IN :types
+            GROUP BY m.chatroom.id
+            """)
+    List<Object[]> findLastMessageTimesByChatroomIds(
+            @Param("chatroomIds") List<Long> chatroomIds,
+            @Param("types") List<ChatMessageType> types);
+
     @Query(value = """
             SELECT MAX(
                 COALESCE(
