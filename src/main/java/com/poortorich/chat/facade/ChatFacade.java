@@ -147,9 +147,6 @@ public class ChatFacade {
         List<ChatroomResponse> chatroomResponses = new ArrayList<>();
         for (int i = 0; i < chatrooms.size(); i++) {
             Chatroom chatroom = chatrooms.get(i);
-            if (chatroom == null) {
-                continue;
-            }
 
             chatroomResponses.add(
                     chatBuilder.buildChatroomResponse(

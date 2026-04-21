@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.DefaultTypedTuple;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.ZSetOperations.TypedTuple;
 import org.springframework.stereotype.Repository;
 
@@ -116,6 +117,22 @@ public class RedisChatRepository {
                 .hasNext(hasNext)
                 .nextCursor(lastScore != null ? lastScore.longValue() : null)
                 .build();
+    }
+
+    public void removeChatroomFromCurrentVersion(Long chatroomId) {
+        Long version = getCurrentVersion();
+        if (version == -1L) {
+            return;
+        }
+
+        String pattern = chatroomId + ":*";
+        for (SortBy sortBy : SortBy.values()) {
+            String key = getRedisChatKey(sortBy.name(), version);
+            redisTemplate.opsForZSet()
+                    .scan(key, ScanOptions.scanOptions().match(pattern).build())
+                    .forEachRemaining(tuple ->
+                            redisTemplate.opsForZSet().remove(key, tuple.getValue()));
+        }
     }
 
     public boolean existsBySortBy(SortBy sortBy, Long version) {
