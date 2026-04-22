@@ -67,12 +67,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Service
 @RequiredArgsConstructor
@@ -134,36 +134,19 @@ public class ChatFacade {
         }
 
         List<Chatroom> chatrooms = chatroomService.findByIds(chatroomContext.getChatroomIds());
+        List<Long> chatroomIds = chatroomContext.getChatroomIds();
         List<String> lastMessageTimes = chatroomContext.getLastMessageTimes();
+
+        Map<Long, String> lastMessageTimeMap = IntStream.range(0, chatroomIds.size())
+                .boxed()
+                .collect(Collectors.toMap(chatroomIds::get, lastMessageTimes::get));
 
         return AllChatroomsResponse.builder()
                 .hasNext(chatroomContext.getHasNext())
                 .nextCursor(chatroomContext.getNextCursor())
                 .version(chatroomContext.getVersion())
-                .chatrooms(getChatroomResponses(chatrooms, lastMessageTimes))
+                .chatrooms(getChatroomResponses(chatrooms, lastMessageTimeMap))
                 .build();
-    }
-
-    private List<ChatroomResponse> getChatroomResponses(List<Chatroom> chatrooms, List<String> lastMessageTimes) {
-        List<Long> chatroomIds = chatrooms.stream().map(Chatroom::getId).toList();
-        Map<Long, List<String>> tagMap = tagService.getTagNamesByChatroomIds(chatroomIds);
-        Map<Long, Long> participantCountMap = chatParticipantService.countByChatroomIds(chatroomIds);
-
-        List<ChatroomResponse> chatroomResponses = new ArrayList<>();
-        for (int i = 0; i < chatrooms.size(); i++) {
-            Chatroom chatroom = chatrooms.get(i);
-            Long chatroomId = chatroom.getId();
-
-            chatroomResponses.add(
-                    chatBuilder.buildChatroomResponse(
-                            chatroom,
-                            tagMap.getOrDefault(chatroomId, List.of()),
-                            participantCountMap.getOrDefault(chatroomId, 0L),
-                            lastMessageTimes.get(i))
-            );
-        }
-
-        return chatroomResponses;
     }
 
     private AllChatroomsResponse getAllChatroomsResponseEmptyChatroom() {
@@ -193,9 +176,13 @@ public class ChatFacade {
 
     private List<ChatroomResponse> getChatroomResponses(List<Chatroom> chatrooms) {
         List<Long> chatroomIds = chatrooms.stream().map(Chatroom::getId).toList();
+        return getChatroomResponses(chatrooms, chatMessageService.getLastMessageTimesByChatroomIds(chatroomIds));
+    }
+
+    private List<ChatroomResponse> getChatroomResponses(List<Chatroom> chatrooms, Map<Long, String> lastMessageTimeMap) {
+        List<Long> chatroomIds = chatrooms.stream().map(Chatroom::getId).toList();
         Map<Long, List<String>> tagMap = tagService.getTagNamesByChatroomIds(chatroomIds);
         Map<Long, Long> participantCountMap = chatParticipantService.countByChatroomIds(chatroomIds);
-        Map<Long, String> lastMessageTimeMap = chatMessageService.getLastMessageTimesByChatroomIds(chatroomIds);
 
         return chatrooms.stream()
                 .filter(Objects::nonNull)
@@ -323,14 +310,19 @@ public class ChatFacade {
     @Transactional
     public ChatroomLeaveAllResponse leaveAllChatroom(String username, ChatroomLeaveAllRequest chatroomLeaveAllRequest) {
         User user = userService.findUserByUsername(username);
-        for (Long chatroomId : chatroomLeaveAllRequest.getChatroomsToLeave()) {
-            Chatroom chatroom = chatroomService.findById(chatroomId);
-            ChatParticipant chatParticipant = chatParticipantService.findByUserAndChatroom(user, chatroom);
-            chatroomLeaveService.leaveChatroom(chatParticipant, false);
+        List<Long> chatroomIds = chatroomLeaveAllRequest.getChatroomsToLeave();
+
+        Map<Long, ChatParticipant> participantMap = chatParticipantService.findAllByUserAndChatroomIds(user, chatroomIds);
+
+        for (Long chatroomId : chatroomIds) {
+            ChatParticipant chatParticipant = participantMap.get(chatroomId);
+            if (chatParticipant != null) {
+                chatroomLeaveService.leaveChatroom(chatParticipant, false);
+            }
         }
 
         return ChatroomLeaveAllResponse.builder()
-                .deletedChatroomIds(chatroomLeaveAllRequest.getChatroomsToLeave())
+                .deletedChatroomIds(chatroomIds)
                 .build();
     }
 

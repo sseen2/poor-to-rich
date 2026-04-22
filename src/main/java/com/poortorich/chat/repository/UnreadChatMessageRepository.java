@@ -66,7 +66,9 @@ public interface UnreadChatMessageRepository extends JpaRepository<UnreadChatMes
             """)
     void markAllMessageAsRead(@Param("chatrooms") List<Chatroom> chatrooms, @Param("users") List<User> users);
 
-    void deleteByChatroom(Chatroom chatroom);
+    @Modifying(clearAutomatically = true)
+    @Query("DELETE FROM UnreadChatMessage u WHERE u.chatroom = :chatroom")
+    void deleteByChatroom(@Param("chatroom") Chatroom chatroom);
 
     Long countByUserAndChatroom(User user, Chatroom chatroom);
 }

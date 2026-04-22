@@ -156,8 +156,7 @@ public class ChatMessageService {
 
     @Transactional
     public void closeAllMessagesByChatroom(Chatroom chatroom) {
-        chatMessageRepository.findAllByChatroom(chatroom)
-                .forEach(ChatMessage::closeChatroom);
+        chatMessageRepository.closeAllByChatroom(chatroom, LocalDateTime.now());
     }
 
     @Transactional

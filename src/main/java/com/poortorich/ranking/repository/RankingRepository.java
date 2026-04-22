@@ -3,7 +3,9 @@ package com.poortorich.ranking.repository;
 import com.poortorich.chat.entity.Chatroom;
 import com.poortorich.ranking.entity.Ranking;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
@@ -29,5 +31,7 @@ public interface RankingRepository extends JpaRepository<Ranking, Long> {
             """)
     List<Ranking> findAllByChatroomWithDateIn(Chatroom chatroom, List<LocalDate> mondays);
 
-    void deleteByChatroom(Chatroom chatroom);
+    @Modifying(clearAutomatically = true)
+    @Query("DELETE FROM Ranking r WHERE r.chatroom = :chatroom")
+    void deleteByChatroom(@Param("chatroom") Chatroom chatroom);
 }

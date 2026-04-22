@@ -9,6 +9,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -23,7 +24,13 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
 
     List<ChatMessage> findAllByChatroom(Chatroom chatroom);
 
-    void deleteByChatroom(Chatroom chatroom);
+    @Modifying(clearAutomatically = true)
+    @Query("DELETE FROM ChatMessage m WHERE m.chatroom = :chatroom")
+    void deleteByChatroom(@Param("chatroom") Chatroom chatroom);
+
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE ChatMessage m SET m.isDeleted = true, m.deleteAt = :deleteAt WHERE m.chatroom = :chatroom")
+    void closeAllByChatroom(@Param("chatroom") Chatroom chatroom, @Param("deleteAt") LocalDateTime deleteAt);
 
     Slice<ChatMessage> findByChatroomAndIdLessThanEqualAndIdBetweenOrderByIdDesc(
             Chatroom chatroom,

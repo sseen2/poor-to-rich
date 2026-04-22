@@ -6,6 +6,7 @@ import com.poortorich.chat.entity.enums.RankingStatus;
 import com.poortorich.user.entity.User;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -18,6 +19,16 @@ import java.util.Optional;
 public interface ChatParticipantRepository extends JpaRepository<ChatParticipant, Long> {
 
     Optional<ChatParticipant> findByUserAndChatroom(User user, Chatroom chatroom);
+
+    @Query("""
+            SELECT cp FROM ChatParticipant cp
+            JOIN FETCH cp.chatroom
+            WHERE cp.user = :user
+            AND cp.chatroom.id IN :chatroomIds
+            """)
+    List<ChatParticipant> findAllByUserAndChatroomIds(
+            @Param("user") User user,
+            @Param("chatroomIds") List<Long> chatroomIds);
 
     @Query("""
                 SELECT cp
@@ -70,7 +81,9 @@ public interface ChatParticipantRepository extends JpaRepository<ChatParticipant
 
     List<ChatParticipant> findAllByChatroomAndIsParticipatedTrue(Chatroom chatroom);
 
-    void deleteByChatroom(Chatroom chatroom);
+    @Modifying(clearAutomatically = true)
+    @Query("DELETE FROM ChatParticipant cp WHERE cp.chatroom = :chatroom")
+    void deleteByChatroom(@Param("chatroom") Chatroom chatroom);
 
     List<ChatParticipant> findAllByChatroom(Chatroom chatroom);
 

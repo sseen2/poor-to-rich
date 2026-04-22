@@ -75,6 +75,11 @@ public class ChatParticipantService {
                 .orElseThrow(() -> new NotFoundException(ChatResponse.CHAT_PARTICIPANT_NOT_FOUND));
     }
 
+    public Map<Long, ChatParticipant> findAllByUserAndChatroomIds(User user, List<Long> chatroomIds) {
+        return chatParticipantRepository.findAllByUserAndChatroomIds(user, chatroomIds).stream()
+                .collect(Collectors.toMap(cp -> cp.getChatroom().getId(), cp -> cp));
+    }
+
     public Optional<ChatParticipant> getChatParticipant(User user, Chatroom chatroom) {
         return chatParticipantRepository.findByUserAndChatroom(user, chatroom);
     }
