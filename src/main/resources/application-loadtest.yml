@@ -1,0 +1,36 @@
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 3
+      minimum-idle: 1
+      connection-timeout: 5000
+      idle-timeout: 30000
+      max-lifetime: 1800000
+
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        use_sql_comments: false
+
+server:
+  tomcat:
+    threads:
+      max: 25
+      min-spare: 5
+    accept-count: 20
+    max-connections: 80
+
+ranking:
+  task-executor:
+    core-pool-size: 2
+    max-pool-size: 2
+    queue-capacity: 100
+
+logging:
+  level:
+    root: INFO
+    org.hibernate.SQL: OFF
+    org.hibernate.orm.jdbc.bind: OFF
+    com.zaxxer.hikari: DEBUG

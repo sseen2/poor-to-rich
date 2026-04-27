@@ -98,6 +98,12 @@ kakao:
   admin:
     key: ${KAKAO_ADMIN}
 
+ranking:
+  task-executor:
+    core-pool-size: 10
+    max-pool-size: 10
+    queue-capacity: 100
+
 logging:
   level:
     org.hibernate.SQL: DEBUG
