@@ -39,3 +39,5 @@ out/
 ### security ###
 .env
 mysqld-exporter.cnf
+sql/
+*.hprof

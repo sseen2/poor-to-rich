@@ -49,14 +49,40 @@ services:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--web.enable-remote-write-receiver'
     depends_on:
       - redis-exporter
       - mysqld-exporter
 
   grafana:
     image: grafana/grafana
+    container_name: poor_to_rich_grafana
     ports:
       - ${GRAFANA_BINDING_PORT}:${GRAFANA_PORT}
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+
+  k6:
+    image: grafana/k6:latest
+    container_name: poor_to_rich_k6
+    profiles: ["k6"]
+    environment:
+      - BASE_URL=http://app:8080
+      - K6_PROMETHEUS_RW_SERVER_URL=http://prometheus:9090/api/v1/write
+      - K6_PROMETHEUS_RW_PUSH_INTERVAL=1s
+      - JWT_TOKEN=${K6_JWT_TOKEN:-}
+      - LOGIN_PASSWORD=${LOGIN_PASSWORD:-}
+    volumes:
+      - ./k6/scripts:/scripts
+    depends_on:
+      - prometheus
+      - app
+    command: run --out experimental-prometheus-rw /scripts/connection_pool_exhaustion.js
 
   app:
     build: .
@@ -68,7 +94,8 @@ services:
       - "${APP_BINDING_PORT}:${APP_PORT}"
     environment:
       TZ: Asia/Seoul
-      JAVA_OPTS: -Duser.timezone=Asia/Seoul
+      JAVA_OPTS: ${JAVA_OPTS:--Xms128m -Xmx384m -Duser.timezone=Asia/Seoul}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-}
       SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
@@ -83,6 +110,8 @@ services:
       KAKAO_ADMIN: ${KAKAO_ADMIN}
     env_file:
       - .env
+
 volumes:
   mariadb_data:
   redis_data:
+  grafana_data:
