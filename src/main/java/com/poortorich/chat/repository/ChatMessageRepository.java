@@ -29,6 +29,10 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     void deleteByChatroom(@Param("chatroom") Chatroom chatroom);
 
     @Modifying(clearAutomatically = true)
+    @Query("DELETE FROM ChatMessage m WHERE m.type = :type AND m.sentAt > :since")
+    void deleteByTypeAndSentAtAfter(@Param("type") ChatMessageType type, @Param("since") LocalDateTime since);
+
+    @Modifying(clearAutomatically = true)
     @Query("UPDATE ChatMessage m SET m.isDeleted = true, m.deleteAt = :deleteAt WHERE m.chatroom = :chatroom")
     void closeAllByChatroom(@Param("chatroom") Chatroom chatroom, @Param("deleteAt") LocalDateTime deleteAt);
 

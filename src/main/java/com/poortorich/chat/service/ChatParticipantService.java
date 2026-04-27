@@ -206,6 +206,14 @@ public class ChatParticipantService {
         participants.forEach(participant -> participant.updateRankingStatus(rankingStatus));
     }
 
+    @Transactional
+    public void resetAllRankingStatus() {
+        chatParticipantRepository.resetRankingStatusToNone(
+                RankingStatus.NONE,
+                List.of(RankingStatus.SAVER, RankingStatus.FLEXER)
+        );
+    }
+
     public ChatParticipant findByChatroomAndRankingStatus(Chatroom chatroom, RankingStatus rankingStatus) {
         return chatParticipantRepository.findByChatroomAndRankingStatus(chatroom, rankingStatus)
                 .orElse(null);

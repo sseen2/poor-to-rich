@@ -92,4 +92,9 @@ public class RankingService {
     public void deleteAllByChatroom(Chatroom chatroom) {
         rankingRepository.deleteByChatroom(chatroom);
     }
+
+    @Transactional
+    public void deleteByCreatedDateAfter(LocalDateTime since) {
+        rankingRepository.deleteByCreatedDateAfter(since);
+    }
 }

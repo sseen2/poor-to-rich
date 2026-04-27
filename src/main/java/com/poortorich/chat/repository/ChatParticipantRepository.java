@@ -189,4 +189,8 @@ public interface ChatParticipantRepository extends JpaRepository<ChatParticipant
             Pageable pageable);
 
     Optional<ChatParticipant> findByChatroomAndRankingStatus(Chatroom chatroom, RankingStatus rankingStatus);
+
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE ChatParticipant cp SET cp.rankingStatus = :none WHERE cp.rankingStatus IN :statuses")
+    void resetRankingStatusToNone(@Param("none") RankingStatus none, @Param("statuses") List<RankingStatus> statuses);
 }

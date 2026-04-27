@@ -34,4 +34,8 @@ public interface RankingRepository extends JpaRepository<Ranking, Long> {
     @Modifying(clearAutomatically = true)
     @Query("DELETE FROM Ranking r WHERE r.chatroom = :chatroom")
     void deleteByChatroom(@Param("chatroom") Chatroom chatroom);
+
+    @Modifying(clearAutomatically = true)
+    @Query("DELETE FROM Ranking r WHERE r.createdDate > :since")
+    void deleteByCreatedDateAfter(@Param("since") LocalDateTime since);
 }

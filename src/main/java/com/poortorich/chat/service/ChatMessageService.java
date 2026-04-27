@@ -179,6 +179,11 @@ public class ChatMessageService {
         chatMessageRepository.deleteByChatroom(chatroom);
     }
 
+    @Transactional
+    public void deleteRankingMessagesSince(LocalDateTime since) {
+        chatMessageRepository.deleteByTypeAndSentAtAfter(ChatMessageType.RANKING_MESSAGE, since);
+    }
+
     public Long getLatestMessageIdWithTypes(Chatroom chatroom) {
         return chatMessageRepository.findTopByChatroomAndTypeInOrderByIdDesc(
                         chatroom,
