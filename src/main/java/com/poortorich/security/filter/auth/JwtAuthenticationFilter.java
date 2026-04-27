@@ -29,6 +29,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Optional;
+import org.springframework.util.AntPathMatcher;
 
 @Component
 @RequiredArgsConstructor
@@ -36,6 +37,7 @@ import java.util.Optional;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final AntPathMatcher pathMatcher = new AntPathMatcher();
 
     private final JwtTokenValidator tokenValidator;
     private final JwtTokenExtractor tokenExtractor;
@@ -55,8 +57,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain
     ) throws ServletException, IOException {
-        if (isAuthenticated() || Arrays.asList(SecurityConstants.PERMIT_ALL_ENDPOINTS)
-                .contains(request.getRequestURI())) {
+        if (isAuthenticated() || isPermitAllEndpoint(request.getRequestURI())) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -70,6 +71,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isPermitAllEndpoint(String requestUri) {
+        return Arrays.stream(SecurityConstants.PERMIT_ALL_ENDPOINTS)
+                .anyMatch(pattern -> pathMatcher.match(pattern, requestUri));
     }
 
     private boolean isAuthenticated() {

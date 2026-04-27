@@ -29,7 +29,7 @@ public class SecurityConstants {
             "/user/username-recovery",
             "/user/reset-password",
             "/chat-websocket/**",
-            "/chat/**"
+            "/ranking/test/**"
     };
     public static final String CORS_ALL_PATH = "/**";
 
