@@ -12,16 +12,6 @@ services:
     volumes:
       - mariadb_data:/var/lib/mysql
 
-  mysqld-exporter:
-    image: prom/mysqld-exporter
-    container_name: poor_to_rich_mysqld_exporter
-    volumes:
-      - ./mysqld-exporter.cnf:/.my.cnf
-    ports:
-      - "9104:9104"
-    depends_on:
-      - db
-
   redis:
     image: redis:alpine
     container_name: poor_to_rich_redis
@@ -29,60 +19,6 @@ services:
       - "${REDIS_BINDING_PORT:-6379}:${REDIS_PORT}"
     volumes:
       - redis_data:/var/lib/redis
-
-  redis-exporter:
-    image: oliver006/redis_exporter
-    container_name: poor_to_rich_redis_exporter
-    environment:
-      - REDIS_ADDR=redis:6379
-    ports:
-      - "9121:9121"
-    depends_on:
-      - redis
-
-  prometheus:
-    image: prom/prometheus
-    container_name: poor_to_rich_prometheus
-    ports:
-      - ${PROMETHEUS_BINDING_PORT}:${PROMETHEUS_PORT}
-    volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--web.enable-remote-write-receiver'
-    depends_on:
-      - redis-exporter
-      - mysqld-exporter
-
-  grafana:
-    image: grafana/grafana
-    container_name: poor_to_rich_grafana
-    ports:
-      - ${GRAFANA_BINDING_PORT}:${GRAFANA_PORT}
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning
-    depends_on:
-      - prometheus
-
-  k6:
-    image: grafana/k6:latest
-    container_name: poor_to_rich_k6
-    profiles: ["k6"]
-    environment:
-      - BASE_URL=http://app:8080
-      - K6_PROMETHEUS_RW_SERVER_URL=http://prometheus:9090/api/v1/write
-      - K6_PROMETHEUS_RW_PUSH_INTERVAL=1s
-      - JWT_TOKEN=${K6_JWT_TOKEN:-}
-      - LOGIN_PASSWORD=${LOGIN_PASSWORD:-}
-    volumes:
-      - ./k6/scripts:/scripts
-    depends_on:
-      - prometheus
-      - app
-    command: run --out experimental-prometheus-rw /scripts/connection_pool_exhaustion.js
 
   app:
     build: .
@@ -114,4 +50,3 @@ services:
 volumes:
   mariadb_data:
   redis_data:
-  grafana_data:
