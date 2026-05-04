@@ -24,7 +24,7 @@ server:
 
 ranking:
   scheduler:
-    batch-size: 200
+    batch-size: 100
   task-executor:
     core-pool-size: 2
     max-pool-size: 2
