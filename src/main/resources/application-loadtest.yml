@@ -23,6 +23,8 @@ server:
     max-connections: 80
 
 ranking:
+  scheduler:
+    batch-size: 200
   task-executor:
     core-pool-size: 2
     max-pool-size: 2

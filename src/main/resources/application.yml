@@ -99,6 +99,8 @@ kakao:
     key: ${KAKAO_ADMIN}
 
 ranking:
+  scheduler:
+    batch-size: 200
   task-executor:
     core-pool-size: 10
     max-pool-size: 10

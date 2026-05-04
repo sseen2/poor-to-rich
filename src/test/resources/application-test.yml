@@ -8,8 +8,8 @@ spring:
     username: # DB 계정
     password: # DB 비밀번호
     hikari:
-      maximum-pool-size: 10
-      minimum-idle: 2
+      maximum-pool-size: 5
+      minimum-idle: 5
       idle-timeout: 30000
       connection-timeout: 30000
       max-lifetime: 1800000
@@ -98,6 +98,14 @@ jwt:
 kakao:
   admin:
     key: dummy_admin_key
+
+ranking:
+  scheduler:
+    batch-size: 200
+  task-executor:
+    core-pool-size: 2
+    max-pool-size: 2
+    queue-capacity: 100
 
 logging:
   level:
