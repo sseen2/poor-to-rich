@@ -37,6 +37,8 @@ const LOGIN_USER_COUNT = Number(__ENV.LOGIN_USER_COUNT || 500);
 const LOGIN_USERNAME_PREFIX = __ENV.LOGIN_USERNAME_PREFIX || 'user_';
 const LOGIN_PASSWORD = __ENV.LOGIN_PASSWORD || '';
 const YEARLY_TOTAL_DATE = __ENV.YEARLY_TOTAL_DATE || '2025';
+const FAILED_LOG_SAMPLE_RATE = Number(__ENV.FAILED_LOG_SAMPLE_RATE || 0.05);
+const FAILED_LOG_BODY_LIMIT = Number(__ENV.FAILED_LOG_BODY_LIMIT || 300);
 
 const triggerStart = BASELINE_SECONDS;
 const duringStart = BASELINE_SECONDS + TRIGGER_BUFFER_SECONDS;
@@ -250,7 +252,7 @@ function callUsername(prefix, durationTrend, successCounter, failCounter) {
     });
 
     durationTrend.add(res.timings.duration);
-    recordResult(res, successCounter, failCounter);
+    recordResult('username', res, successCounter, failCounter);
     sleep(0.1);
 }
 
@@ -262,7 +264,7 @@ function callNickname(prefix, durationTrend, successCounter, failCounter) {
     });
 
     durationTrend.add(res.timings.duration);
-    recordResult(res, successCounter, failCounter);
+    recordResult('nickname', res, successCounter, failCounter);
     sleep(0.1);
 }
 
@@ -274,7 +276,7 @@ function callYearlyTotal(tokens, durationTrend, successCounter, failCounter) {
     });
 
     durationTrend.add(res.timings.duration);
-    recordResult(res, successCounter, failCounter);
+    recordResult('yearly', res, successCounter, failCounter);
     sleep(0.1);
 }
 
@@ -282,16 +284,33 @@ function callHealth(durationTrend, successCounter, failCounter) {
     const res = http.get(`${BASE_URL}/auth/health`, { timeout: REQUEST_TIMEOUT });
 
     durationTrend.add(res.timings.duration);
-    recordResult(res, successCounter, failCounter);
+    recordResult('health', res, successCounter, failCounter);
     sleep(0.1);
 }
 
-function recordResult(res, successCounter, failCounter) {
+function recordResult(label, res, successCounter, failCounter) {
     if (res.status >= 200 && res.status < 300) {
         successCounter.add(1);
         return;
     }
+
     failCounter.add(1);
+    logFailedResponse(label, res);
+}
+
+function logFailedResponse(label, res) {
+    if (Math.random() > FAILED_LOG_SAMPLE_RATE) {
+        return;
+    }
+
+    const body = res.body ? String(res.body).slice(0, FAILED_LOG_BODY_LIMIT) : '';
+    console.error([
+        `[request failed:${label}]`,
+        `status=${res.status}`,
+        `error=${res.error || ''}`,
+        `duration=${res.timings.duration.toFixed(2)}ms`,
+        `body=${body}`,
+    ].join(' '));
 }
 
 function uniqueValue(prefix) {
