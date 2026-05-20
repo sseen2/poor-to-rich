@@ -48,6 +48,7 @@ public class ChatMessageService {
 
     private final ChatMessageRepository chatMessageRepository;
     private final UnreadChatMessageService unreadChatMessageService;
+    private final ChatroomSummaryService chatroomSummaryService;
 
     private final RankerProfileMapper rankerProfileMapper;
     private final UserChatMessageBuilder userChatMessageBuilder;
@@ -89,13 +90,6 @@ public class ChatMessageService {
                 .build();
     }
 
-    public String getLastMessageTime(Chatroom chatroom) {
-        return chatMessageRepository.findTopByChatroomAndTypeInOrderByIdDesc(
-                        chatroom, List.of(ChatMessageType.CHAT_MESSAGE, ChatMessageType.RANKING_MESSAGE))
-                .map(chatMessage -> chatMessage.getSentAt().toString())
-                .orElse("");
-    }
-
     public Map<Long, String> getLastMessageTimesByChatroomIds(List<Long> chatroomIds) {
         return chatMessageRepository.findLastMessageTimesByChatroomIds(
                         chatroomIds, List.of(ChatMessageType.CHAT_MESSAGE, ChatMessageType.RANKING_MESSAGE))
@@ -115,6 +109,7 @@ public class ChatMessageService {
         dateChangeDetector.detect(chatParticipant.getChatroom());
         ChatMessage chatMessage = chatMessageRepository.save(
                 userChatMessageBuilder.buildChatMessage(chatParticipant, chatMessageRequestPayload));
+        chatroomSummaryService.updateLastMessage(chatMessage);
 
         List<Long> unreadBy = unreadChatMessageService.saveUnreadMember(chatMessage, chatMembers);
 
@@ -314,6 +309,7 @@ public class ChatMessageService {
 
         ChatMessage rankingMessage = RankingMessageBuilder.buildRankingMessage(chatroom, ranking);
         rankingMessage = chatMessageRepository.save(rankingMessage);
+        chatroomSummaryService.updateLastMessage(rankingMessage);
 
         return RankingResponsePayload.builder()
                 .messageId(rankingMessage.getId())

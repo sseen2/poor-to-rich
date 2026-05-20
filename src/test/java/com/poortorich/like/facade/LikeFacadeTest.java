@@ -2,6 +2,7 @@ package com.poortorich.like.facade;
 
 import com.poortorich.chat.entity.Chatroom;
 import com.poortorich.chat.service.ChatroomService;
+import com.poortorich.chat.service.ChatroomSummaryService;
 import com.poortorich.like.request.LikeUpdateRequest;
 import com.poortorich.like.response.LikeStatusResponse;
 import com.poortorich.like.service.LikeService;
@@ -25,6 +26,8 @@ class LikeFacadeTest {
     private UserService userService;
     @Mock
     private ChatroomService chatroomService;
+    @Mock
+    private ChatroomSummaryService chatroomSummaryService;
     @Mock
     private LikeService likeService;
 
@@ -68,6 +71,7 @@ class LikeFacadeTest {
         LikeStatusResponse result = likeFacade.updateChatroomLike(username, chatroomId, request);
 
         verify(likeService).updateLikeStatus(user, chatroom, request.getIsLiked());
+        verify(chatroomSummaryService).updateLikeCount(chatroom, 3L);
         assertThat(result).isNotNull();
         assertThat(result.getIsLiked()).isTrue();
         assertThat(result.getLikeCount()).isEqualTo(3L);

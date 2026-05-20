@@ -3,8 +3,6 @@ package com.poortorich.chat.repository;
 import com.poortorich.chat.entity.Chatroom;
 import com.poortorich.chat.entity.enums.ChatroomRole;
 import com.poortorich.user.entity.User;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -27,49 +25,6 @@ public interface ChatroomRepository extends JpaRepository<Chatroom, Long> {
                    AND cp.role = :role
             """)
     List<Chatroom> findChatroomByUserAndRole(@Param("user") User user, @Param("role") ChatroomRole role);
-
-    @Query("""
-                SELECT c
-                  FROM Chatroom c
-                  LEFT JOIN ChatMessage cm ON cm.chatroom = c
-                        AND cm.type IN ('CHAT_MESSAGE', 'RANKING_MESSAGE')
-                  LEFT JOIN Like l ON l.chatroom = c
-                        AND l.likeStatus = true
-                  LEFT JOIN ChatParticipant cp ON cp.chatroom = c
-                        AND cp.isParticipated = true
-                WHERE c.isClosed = false
-                GROUP BY c.id
-                ORDER BY MAX(cm.sentAt) DESC,
-                         COUNT(DISTINCT l.id) DESC,
-                         COUNT(DISTINCT cp.id) DESC,
-                         c.createdDate DESC,
-                         c.id ASC
-            """)
-    List<Chatroom> findChatroomsSortByUpdatedAt();
-
-    @Query("""
-                SELECT c
-                  FROM Chatroom c
-                  LEFT JOIN Like l ON l.chatroom = c
-                        AND l.likeStatus = true
-                  LEFT JOIN ChatParticipant cp ON cp.chatroom = c
-                        AND cp.isParticipated = true
-                WHERE c.isClosed = false
-                GROUP BY c.id
-                ORDER BY COUNT(DISTINCT l.id) DESC,
-                         COUNT(DISTINCT cp.id) DESC,
-                         c.createdDate DESC,
-                         c.id ASC
-            """)
-    List<Chatroom> findChatroomsSortByLike();
-
-    @Query("""
-                SELECT c
-                  FROM Chatroom c
-                WHERE c.isClosed = false
-                ORDER BY c.id DESC
-            """)
-    List<Chatroom> findChatroomsByCreatedAt();
 
     @Query("""
                 SELECT DISTINCT c

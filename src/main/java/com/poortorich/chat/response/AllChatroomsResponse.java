@@ -14,7 +14,6 @@ import java.util.List;
 public class AllChatroomsResponse {
 
     private Boolean hasNext;
-    private Long nextCursor;
-    private Long version;
+    private String nextCursor;
     private List<ChatroomResponse> chatrooms;
 }

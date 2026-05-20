@@ -19,6 +19,7 @@ public enum ChatResponse implements Response {
     GET_CHATROOM_ROLE_SUCCESS(HttpStatus.OK, ChatResponseMessage.GET_CHATROOM_ROLE_SUCCESS, null),
     GET_ALL_PARTICIPANTS_SUCCESS(HttpStatus.OK, ChatResponseMessage.GET_ALL_PARTICIPANTS_SUCCESS, null),
     SEARCH_PARTICIPANTS_SUCCESS(HttpStatus.OK, ChatResponseMessage.SEARCH_PARTICIPANTS_SUCCESS, null),
+    CURSOR_INVALID(HttpStatus.BAD_REQUEST, ChatResponseMessage.CURSOR_INVALID, "cursor"),
 
     CHATROOM_ENTER_DENIED(HttpStatus.FORBIDDEN, ChatResponseMessage.CHATROOM_ENTER_DENIED, null),
     CHATROOM_PASSWORD_DO_NOT_MATCH(HttpStatus.BAD_REQUEST, ChatResponseMessage.CHATROOM_PASSWORD_DO_NOT_MATCH, null),

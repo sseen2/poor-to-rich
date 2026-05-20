@@ -29,6 +29,7 @@ public class ChatroomLeaveService {
     private final TagService tagService;
     private final ChatMessageService chatMessageService;
     private final ChatroomService chatroomService;
+    private final ChatroomSummaryService chatroomSummaryService;
     private final ChatParticipantService participantService;
 
     private final ChatroomLeaveManager leaveManager;
@@ -52,6 +53,11 @@ public class ChatroomLeaveService {
         participant.leave();
         if (ChatroomRole.HOST.equals(participant.getRole())) {
             deleteChatroom(participant.getChatroom());
+        } else {
+            chatroomSummaryService.updateParticipantCount(
+                    participant.getChatroom(),
+                    participantService.countByChatroom(participant.getChatroom())
+            );
         }
         eventPublisher.publishEvent(new ChatroomUpdateEvent(
                 participant.getChatroom(),

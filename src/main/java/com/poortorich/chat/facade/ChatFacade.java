@@ -46,6 +46,7 @@ import com.poortorich.chat.service.ChatMessageService;
 import com.poortorich.chat.service.ChatParticipantService;
 import com.poortorich.chat.service.ChatroomLeaveService;
 import com.poortorich.chat.service.ChatroomService;
+import com.poortorich.chat.service.ChatroomSummaryService;
 import com.poortorich.chat.service.UnreadChatMessageService;
 import com.poortorich.chat.util.ChatBuilder;
 import com.poortorich.chat.util.detector.RankingStatusChangeDetector;
@@ -82,6 +83,7 @@ public class ChatFacade {
 
     private final UserService userService;
     private final ChatroomService chatroomService;
+    private final ChatroomSummaryService chatroomSummaryService;
     private final ChatParticipantService chatParticipantService;
     private final ChatroomLeaveService chatroomLeaveService;
     private final ChatMessageService chatMessageService;
@@ -111,10 +113,9 @@ public class ChatFacade {
         Chatroom chatroom = chatroomService.createChatroom(imageUrl, request);
         chatParticipantService.createChatroomHost(user, chatroom);
         tagService.createTag(request.getHashtags(), chatroom);
+        chatroomSummaryService.createSummary(chatroom, 1L);
 
         realTimeFacade.createChatroom(username, chatroom.getId(), request.getIsRankingEnabled());
-
-        chatroomService.saveNewVersionChatroomsInRedis();
 
         return ChatroomCreateResponse.builder().newChatroomId(chatroom.getId()).build();
     }
@@ -126,8 +127,8 @@ public class ChatFacade {
         return chatBuilder.buildChatroomInfoResponse(chatroom, hashtags);
     }
 
-    public AllChatroomsResponse getAllChatrooms(SortBy sortBy, Long cursor, Long version) {
-        ChatroomContext chatroomContext = chatroomService.getAllChatrooms(sortBy, cursor, version);
+    public AllChatroomsResponse getAllChatrooms(SortBy sortBy, String cursor) {
+        ChatroomContext chatroomContext = chatroomService.getAllChatrooms(sortBy, cursor);
 
         if (chatroomContext.isEmpty()) {
             return getAllChatroomsResponseEmptyChatroom();
@@ -144,7 +145,6 @@ public class ChatFacade {
         return AllChatroomsResponse.builder()
                 .hasNext(chatroomContext.getHasNext())
                 .nextCursor(chatroomContext.getNextCursor())
-                .version(chatroomContext.getVersion())
                 .chatrooms(getChatroomResponses(chatrooms, lastMessageTimeMap))
                 .build();
     }
@@ -250,6 +250,7 @@ public class ChatFacade {
         chatroomValidator.validatePassword(chatroom, chatroomEnterRequest.getChatroomPassword());
 
         ChatParticipant newParticipant = chatParticipantService.enterUser(user, chatroom);
+        chatroomSummaryService.updateParticipantCount(chatroom, chatParticipantService.countByChatroom(chatroom));
 
         eventPublisher.publishEvent(new ChatroomUpdateEvent(chatroom, PayloadType.CHATROOM_INFO_UPDATED));
         return UserEnterChatroomResult.builder()
@@ -440,6 +441,10 @@ public class ChatFacade {
 
         eventPublisher.publishEvent(new KickChatroomEvent(kickChatParticipant.getId()));
         chatParticipantService.kickChatParticipant(kickChatParticipant);
+        chatroomSummaryService.updateParticipantCount(
+                host.getChatroom(),
+                chatParticipantService.countByChatroom(host.getChatroom())
+        );
 
         eventPublisher.publishEvent(new ChatroomUpdateEvent(host.getChatroom(), PayloadType.CHATROOM_INFO_UPDATED));
         return KickChatParticipantResponse.builder()
