@@ -96,10 +96,9 @@ public class ChatControllerTest extends BaseSecurityTest {
     @DisplayName("전체 채팅방 목록 조회 성공 - 최근대화순")
     void getAllChatroomsSortByUpdatedAtSuccess() throws Exception {
         SortBy sortBy = SortBy.UPDATED_AT;
-        Long cursor = -1L;
-        Long version = 10000000L;
+        String cursor = "-1";
 
-        when(chatFacade.getAllChatrooms(eq(sortBy), eq(cursor), eq(version)))
+        when(chatFacade.getAllChatrooms(eq(sortBy), eq(cursor)))
                 .thenReturn(AllChatroomsResponse.builder().build());
 
         String message = sortBy.getMessage() + ChatResponseMessage.GET_ALL_CHATROOMS_SUCCESS;
@@ -116,10 +115,9 @@ public class ChatControllerTest extends BaseSecurityTest {
     @DisplayName("전체 채팅방 목록 조회 성공 - 최근생성순")
     void getAllChatroomsSortByCreatedAtSuccess() throws Exception {
         SortBy sortBy = SortBy.CREATED_AT;
-        Long cursor = -1L;
-        Long version = 10000000L;
+        String cursor = "-1";
 
-        when(chatFacade.getAllChatrooms(eq(sortBy), eq(cursor), eq(version)))
+        when(chatFacade.getAllChatrooms(eq(sortBy), eq(cursor)))
                 .thenReturn(AllChatroomsResponse.builder().build());
 
         String message = sortBy.getMessage() + ChatResponseMessage.GET_ALL_CHATROOMS_SUCCESS;
@@ -136,10 +134,9 @@ public class ChatControllerTest extends BaseSecurityTest {
     @DisplayName("전체 채팅방 목록 조회 성공 - 좋아요순")
     void getAllChatroomsSortByLikeSuccess() throws Exception {
         SortBy sortBy = SortBy.LIKE;
-        Long cursor = -1L;
-        Long version = 10000000L;
+        String cursor = "-1";
 
-        when(chatFacade.getAllChatrooms(eq(sortBy), eq(cursor), eq(version)))
+        when(chatFacade.getAllChatrooms(eq(sortBy), eq(cursor)))
                 .thenReturn(AllChatroomsResponse.builder().build());
 
         String message = sortBy.getMessage() + ChatResponseMessage.GET_ALL_CHATROOMS_SUCCESS;

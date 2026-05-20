@@ -10,9 +10,8 @@ public class ChatroomContext {
 
     List<Long> chatroomIds;
     List<String> lastMessageTimes;
-    Long version;
     Boolean hasNext;
-    Long nextCursor;
+    String nextCursor;
 
     public boolean isEmpty() {
         return chatroomIds == null || chatroomIds.isEmpty();

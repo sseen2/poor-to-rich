@@ -114,8 +114,6 @@ public class ChatFacade {
 
         realTimeFacade.createChatroom(username, chatroom.getId(), request.getIsRankingEnabled());
 
-        chatroomService.saveNewVersionChatroomsInRedis();
-
         return ChatroomCreateResponse.builder().newChatroomId(chatroom.getId()).build();
     }
 
@@ -126,8 +124,8 @@ public class ChatFacade {
         return chatBuilder.buildChatroomInfoResponse(chatroom, hashtags);
     }
 
-    public AllChatroomsResponse getAllChatrooms(SortBy sortBy, Long cursor, Long version) {
-        ChatroomContext chatroomContext = chatroomService.getAllChatrooms(sortBy, cursor, version);
+    public AllChatroomsResponse getAllChatrooms(SortBy sortBy, String cursor) {
+        ChatroomContext chatroomContext = chatroomService.getAllChatrooms(sortBy, cursor);
 
         if (chatroomContext.isEmpty()) {
             return getAllChatroomsResponseEmptyChatroom();
@@ -144,7 +142,6 @@ public class ChatFacade {
         return AllChatroomsResponse.builder()
                 .hasNext(chatroomContext.getHasNext())
                 .nextCursor(chatroomContext.getNextCursor())
-                .version(chatroomContext.getVersion())
                 .chatrooms(getChatroomResponses(chatrooms, lastMessageTimeMap))
                 .build();
     }

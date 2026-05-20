@@ -6,6 +6,7 @@ import com.poortorich.chat.entity.enums.ChatroomRole;
 import com.poortorich.chat.entity.enums.RankingStatus;
 import com.poortorich.chat.request.ChatroomCreateRequest;
 import com.poortorich.chat.request.enums.SortBy;
+import com.poortorich.chat.realtime.facade.ChatRealTimeFacade;
 import com.poortorich.chat.response.AllChatroomsResponse;
 import com.poortorich.chat.response.AllParticipantsResponse;
 import com.poortorich.chat.response.ChatParticipantProfile;
@@ -41,6 +42,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -59,6 +61,8 @@ class ChatFacadeTest {
     private final List<String> hashtags = List.of("부자", "거지");
     private final Boolean isRankingEnabled = false;
     private final String chatroomPassword = "부자12";
+    @Mock
+    private ChatRealTimeFacade realTimeFacade;
     @Mock
     private UserService userService;
     @Mock
@@ -176,12 +180,18 @@ class ChatFacadeTest {
 
         when(userService.findUserByUsername("test")).thenReturn(user);
         when(chatroomService.getHostedChatrooms(user)).thenReturn(hostedChatrooms);
-        when(tagService.getTagNames(chatroom)).thenReturn(hashtags);
-        when(tagService.getTagNames(chatroom2)).thenReturn(hashtags);
-        when(chatParticipantService.countByChatroom(chatroom)).thenReturn(1L);
-        when(chatParticipantService.countByChatroom(chatroom2)).thenReturn(2L);
-        when(chatMessageService.getLastMessageTime(chatroom)).thenReturn("2025-07-31T02:30");
-        when(chatMessageService.getLastMessageTime(chatroom2)).thenReturn("2025-07-31T03:00");
+        when(tagService.getTagNamesByChatroomIds(List.of(1L, 2L))).thenReturn(Map.of(
+                1L, hashtags,
+                2L, hashtags
+        ));
+        when(chatParticipantService.countByChatroomIds(List.of(1L, 2L))).thenReturn(Map.of(
+                1L, 1L,
+                2L, 2L
+        ));
+        when(chatMessageService.getLastMessageTimesByChatroomIds(List.of(1L, 2L))).thenReturn(Map.of(
+                1L, "2025-07-31T02:30",
+                2L, "2025-07-31T03:00"
+        ));
         when(chatBuilder.buildChatroomResponse(chatroom, hashtags, 1L, "2025-07-31T02:30"))
                 .thenReturn(ChatroomResponse.builder()
                         .chatroomId(chatroom.getId())
@@ -212,54 +222,6 @@ class ChatFacadeTest {
         assertThat(response.getChatrooms().get(1).getChatroomId()).isEqualTo(chatroom2.getId());
     }
 
-//    @Test
-//    @DisplayName("전체 채팅방 목록 조회 성공")
-//    void getAllChatroomsSuccess() {
-//        SortBy sortBy = SortBy.UPDATED_AT;
-//        Long cursor = -1L;
-//        Long version = 1000000L;
-//
-//        Chatroom chatroom1 = Chatroom.builder().id(1L).build();
-//        Chatroom chatroom2 = Chatroom.builder().id(2L).build();
-//
-//        when(chatroomService.getAllChatrooms(sortBy, cursor, version)).thenReturn(List.of(chatroom1, chatroom2));
-//        when(chatroomService.hasNext(sortBy, 2L)).thenReturn(true);
-//        when(chatroomService.getNextCursor(sortBy, 2L)).thenReturn(3L);
-//        when(tagService.getTagNames(any())).thenReturn(hashtags);
-//        when(chatParticipantService.countByChatroom(any())).thenReturn(3L);
-//        when(chatroomService.getAllLastMessageTimes(sortBy, cursor, version)).thenReturn(List.of("", "2025-07-31T02:30"));
-//        when(chatBuilder.buildChatroomResponse(chatroom1, hashtags, 3L, ""))
-//                .thenReturn(ChatroomResponse.builder()
-//                        .chatroomId(chatroom1.getId())
-//                        .chatroomTitle(chatroom1.getTitle())
-//                        .chatroomImage(chatroom1.getImage())
-//                        .description(chatroom1.getDescription())
-//                        .hashtags(hashtags)
-//                        .currentMemberCount(3L)
-//                        .maxMemberCount(chatroom1.getMaxMemberCount())
-//                        .lastMessageTime("")
-//                        .build());
-//
-//        when(chatBuilder.buildChatroomResponse(chatroom2, hashtags, 3L, "2025-07-31T02:30"))
-//                .thenReturn(ChatroomResponse.builder()
-//                        .chatroomId(chatroom2.getId())
-//                        .chatroomTitle(chatroom2.getTitle())
-//                        .chatroomImage(chatroom2.getImage())
-//                        .description(chatroom2.getDescription())
-//                        .hashtags(hashtags)
-//                        .currentMemberCount(3L)
-//                        .maxMemberCount(chatroom2.getMaxMemberCount())
-//                        .lastMessageTime("2025-07-31T02:30")
-//                        .build());
-//        AllChatroomsResponse response = chatFacade.getAllChatrooms(sortBy, cursor, version);
-//
-//        assertThat(response.getChatrooms()).hasSize(2);
-//        assertThat(response.getHasNext()).isTrue();
-//        assertThat(response.getNextCursor()).isEqualTo(3L);
-//        assertThat(response.getChatrooms().get(0).getChatroomId()).isEqualTo(chatroom1.getId());
-//        assertThat(response.getChatrooms().get(1).getChatroomId()).isEqualTo(chatroom2.getId());
-//    }
-
     @Test
     @DisplayName("채팅방 검색 목록 조회 성공")
     void searchChatroomsSuccess() {
@@ -269,9 +231,18 @@ class ChatFacadeTest {
         List<Chatroom> chatrooms = List.of(chatroom1, chatroom2);
 
         when(chatroomService.searchChatrooms(keyword)).thenReturn(chatrooms);
-        when(tagService.getTagNames(any())).thenReturn(hashtags);
-        when(chatParticipantService.countByChatroom(any())).thenReturn(3L);
-        when(chatMessageService.getLastMessageTime(any())).thenReturn("2025-07-31T02:30");
+        when(tagService.getTagNamesByChatroomIds(List.of(1L, 2L))).thenReturn(Map.of(
+                1L, hashtags,
+                2L, hashtags
+        ));
+        when(chatParticipantService.countByChatroomIds(List.of(1L, 2L))).thenReturn(Map.of(
+                1L, 3L,
+                2L, 3L
+        ));
+        when(chatMessageService.getLastMessageTimesByChatroomIds(List.of(1L, 2L))).thenReturn(Map.of(
+                1L, "2025-07-31T02:30",
+                2L, "2025-07-31T02:30"
+        ));
         when(chatBuilder.buildChatroomResponse(chatroom1, hashtags, 3L, "2025-07-31T02:30"))
                 .thenReturn(ChatroomResponse.builder()
                         .chatroomId(chatroom1.getId())

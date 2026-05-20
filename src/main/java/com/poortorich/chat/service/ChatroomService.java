@@ -3,30 +3,29 @@ package com.poortorich.chat.service;
 import com.poortorich.chat.entity.Chatroom;
 import com.poortorich.chat.entity.enums.ChatroomRole;
 import com.poortorich.chat.model.ChatroomContext;
+import com.poortorich.chat.model.ChatroomListProjection;
 import com.poortorich.chat.repository.ChatroomRepository;
-import com.poortorich.chat.repository.RedisChatRepository;
 import com.poortorich.chat.request.ChatroomCreateRequest;
 import com.poortorich.chat.request.enums.SortBy;
 import com.poortorich.chat.response.enums.ChatResponse;
 import com.poortorich.chat.util.ChatBuilder;
+import com.poortorich.global.exceptions.BadRequestException;
 import com.poortorich.global.exceptions.NotFoundException;
 import com.poortorich.user.entity.User;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 @RequiredArgsConstructor
 public class ChatroomService {
 
-    private final ChatMessageService chatMessageService;
+    private static final String CURSOR_DELIMITER = ",";
+    private static final int CHATROOM_PAGE_SIZE = 20;
+
     private final ChatroomRepository chatroomRepository;
-    private final RedisChatRepository redisChatRepository;
 
     private final ChatBuilder chatBuilder;
 
@@ -35,74 +34,118 @@ public class ChatroomService {
         return chatroomRepository.save(chatroom);
     }
 
-    public void saveNewVersionChatroomsInRedis() {
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    saveNewVersion();
-                }
-            });
-        } else {
-            saveNewVersion();
+    public ChatroomContext getAllChatrooms(SortBy sortBy, String cursor) {
+        List<ChatroomListProjection> rows = getChatroomRows(sortBy, cursor, CHATROOM_PAGE_SIZE + 1);
+        boolean hasNext = rows.size() > CHATROOM_PAGE_SIZE;
+
+        if (hasNext) {
+            rows = rows.subList(0, CHATROOM_PAGE_SIZE);
+        }
+
+        return ChatroomContext.builder()
+                .chatroomIds(rows.stream()
+                        .map(ChatroomListProjection::getChatroomId)
+                        .toList())
+                .lastMessageTimes(rows.stream()
+                        .map(ChatroomListProjection::getLastMessageTime)
+                        .toList())
+                .hasNext(hasNext)
+                .nextCursor(getNextCursor(sortBy, rows))
+                .build();
+    }
+
+    private List<ChatroomListProjection> getChatroomRows(SortBy sortBy, String cursor, int size) {
+        return switch (sortBy) {
+            case CREATED_AT -> chatroomRepository.findChatroomsByCreatedAtCursor(parseCreatedAtCursor(cursor), size);
+            case UPDATED_AT -> {
+                UpdatedAtCursor parsedCursor = parseUpdatedAtCursor(cursor);
+                yield chatroomRepository.findChatroomsByUpdatedAtCursor(
+                        parsedCursor.cursorDateTime(),
+                        parsedCursor.chatroomId(),
+                        size
+                );
+            }
+            case LIKE -> {
+                LikeCursor parsedCursor = parseLikeCursor(cursor);
+                yield chatroomRepository.findChatroomsByLikeCursor(
+                        parsedCursor.likeCount(),
+                        parsedCursor.participantCount(),
+                        parsedCursor.chatroomId(),
+                        size
+                );
+            }
+        };
+    }
+
+    private String getNextCursor(SortBy sortBy, List<ChatroomListProjection> rows) {
+        if (rows.isEmpty()) {
+            return null;
+        }
+
+        ChatroomListProjection lastRow = rows.getLast();
+        return switch (sortBy) {
+            case CREATED_AT -> lastRow.getChatroomId().toString();
+            case UPDATED_AT -> lastRow.getCursorDateTime() + CURSOR_DELIMITER + lastRow.getChatroomId();
+            case LIKE -> lastRow.getLikeCount() + CURSOR_DELIMITER
+                    + lastRow.getParticipantCount() + CURSOR_DELIMITER
+                    + lastRow.getChatroomId();
+        };
+    }
+
+    private Long parseCreatedAtCursor(String cursor) {
+        if (isFirstPageCursor(cursor)) {
+            return null;
+        }
+
+        try {
+            return Long.parseLong(cursor);
+        } catch (NumberFormatException exception) {
+            throw new BadRequestException(ChatResponse.CURSOR_INVALID);
         }
     }
 
-    public ChatroomContext getAllChatrooms(SortBy sortBy, Long cursor, Long version) {
-        version = getVersion(version);
-
-        if (!redisChatRepository.existsBySortBy(sortBy, version)) {
-            version = saveNewVersion();
+    private UpdatedAtCursor parseUpdatedAtCursor(String cursor) {
+        if (isFirstPageCursor(cursor)) {
+            return new UpdatedAtCursor(null, null);
         }
 
-        return redisChatRepository.getChatroomData(sortBy, cursor, version, 20);
+        String[] parts = cursor.split(CURSOR_DELIMITER);
+        if (parts.length != 2) {
+            throw new BadRequestException(ChatResponse.CURSOR_INVALID);
+        }
+
+        try {
+            return new UpdatedAtCursor(parts[0], Long.parseLong(parts[1]));
+        } catch (NumberFormatException exception) {
+            throw new BadRequestException(ChatResponse.CURSOR_INVALID);
+        }
     }
 
-    private Long getVersion(Long version) {
-        if (version == -1L) {
-            version = redisChatRepository.getCurrentVersion();
+    private LikeCursor parseLikeCursor(String cursor) {
+        if (isFirstPageCursor(cursor)) {
+            return new LikeCursor(null, null, null);
         }
 
-        return version;
+        String[] parts = cursor.split(CURSOR_DELIMITER);
+        if (parts.length != 3) {
+            throw new BadRequestException(ChatResponse.CURSOR_INVALID);
+        }
+
+        try {
+            return new LikeCursor(Long.parseLong(parts[0]), Long.parseLong(parts[1]), Long.parseLong(parts[2]));
+        } catch (NumberFormatException exception) {
+            throw new BadRequestException(ChatResponse.CURSOR_INVALID);
+        }
     }
 
-    private Long saveNewVersion() {
-        Long newVersion = System.currentTimeMillis();
-
-        saveNewVersionChatroomsInRedis(SortBy.UPDATED_AT, newVersion);
-        saveNewVersionChatroomsInRedis(SortBy.LIKE, newVersion);
-        saveNewVersionChatroomsInRedis(SortBy.CREATED_AT, newVersion);
-
-        redisChatRepository.updateCurrentVersion(newVersion);
-
-        return newVersion;
+    private boolean isFirstPageCursor(String cursor) {
+        return cursor == null || cursor.isBlank() || "-1".equals(cursor);
     }
 
-    private void saveNewVersionChatroomsInRedis(SortBy sortBy, Long newVersion) {
-        List<Chatroom> chatrooms = getBySortBy(sortBy);
-        if (chatrooms.isEmpty()) {
-            return;
-        }
-
-        List<Long> chatroomIds = chatrooms.stream().map(Chatroom::getId).toList();
-        Map<Long, String> lastMessageTimeMap = chatMessageService.getLastMessageTimesByChatroomIds(chatroomIds);
-        List<String> lastMessageTimes = chatroomIds.stream()
-                .map(id -> lastMessageTimeMap.getOrDefault(id, ""))
-                .toList();
-
-        redisChatRepository.saveNewVersion(sortBy, chatroomIds, lastMessageTimes, newVersion);
+    private record UpdatedAtCursor(String cursorDateTime, Long chatroomId) {
     }
 
-    private List<Chatroom> getBySortBy(SortBy sortBy) {
-        if (sortBy.equals(SortBy.LIKE)) {
-            return chatroomRepository.findChatroomsSortByLike();
-        }
-
-        if (sortBy.equals(SortBy.UPDATED_AT)) {
-            return chatroomRepository.findChatroomsSortByUpdatedAt();
-        }
-
-        return chatroomRepository.findChatroomsByCreatedAt();
+    private record LikeCursor(Long likeCount, Long participantCount, Long chatroomId) {
     }
 
     public List<Chatroom> findByIds(List<Long> chatroomIds) {
@@ -126,21 +169,15 @@ public class ChatroomService {
 
     @Transactional
     public void closeChatroomById(Long chatroomId) {
-        chatroomRepository.findById(chatroomId)
-                .orElseThrow(() -> new NotFoundException(ChatResponse.CHATROOM_NOT_FOUND))
-                .closeChatroom();
-
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                redisChatRepository.removeChatroomFromCurrentVersion(chatroomId);
-            }
-        });
+        Chatroom chatroom = chatroomRepository.findById(chatroomId)
+                .orElseThrow(() -> new NotFoundException(ChatResponse.CHATROOM_NOT_FOUND));
+        chatroom.closeChatroom();
     }
 
     @Transactional
     public void deleteById(Long chatroomId) {
-        chatroomRepository.deleteById(chatroomId);
+        Chatroom chatroom = findById(chatroomId);
+        chatroomRepository.delete(chatroom);
     }
 
     public Long getFirstChatroomIdByUser(User user) {

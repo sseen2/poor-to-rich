@@ -9,6 +9,7 @@ import com.poortorich.user.entity.User;
 import com.poortorich.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +26,7 @@ public class LikeFacade {
         return buildLikeStatusResponse(user, chatroom);
     }
 
+    @Transactional
     public LikeStatusResponse updateChatroomLike(
             String username,
             Long chatroomId,
@@ -33,14 +35,19 @@ public class LikeFacade {
         User user = userService.findUserByUsername(username);
         Chatroom chatroom = chatroomService.findById(chatroomId);
         likeService.updateLikeStatus(user, chatroom, request.getIsLiked());
+        Long likeCount = likeService.getLikeCount(chatroom);
 
-        return buildLikeStatusResponse(user, chatroom);
+        return buildLikeStatusResponse(user, chatroom, likeCount);
     }
 
     private LikeStatusResponse buildLikeStatusResponse(User user, Chatroom chatroom) {
+        return buildLikeStatusResponse(user, chatroom, likeService.getLikeCount(chatroom));
+    }
+
+    private LikeStatusResponse buildLikeStatusResponse(User user, Chatroom chatroom, Long likeCount) {
         return LikeStatusResponse.builder()
                 .isLiked(likeService.getLikeStatus(user, chatroom))
-                .likeCount(likeService.getLikeCount(chatroom))
+                .likeCount(likeCount)
                 .build();
     }
 }

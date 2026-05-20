@@ -1,0 +1,14 @@
+
+============================================================
+        Ranking scheduler API latency comparison (k6)
+============================================================
+BASE_URL=http://54.180.106.168:8080
+baseline=30s, during=120s, db_vus=10, yearly_vus=50, health_vus=2, timeout=60s
+login users=10, yearly_total_date=2025, login ok=10, fail=0
+scheduler trigger ok=1, fail=0
+------------------------------------------------------------
+username   | baseline avg=3741.51ms, p95=4918.72ms, ok=84, fail=0 | during avg=2514.42ms, p95=4756.12ms, ok=363, fail=22
+nickname   | baseline avg=3842.42ms, p95=4950.03ms, ok=82, fail=0 | during avg=1982.24ms, p95=4735.28ms, ok=478, fail=15
+yearly     | baseline avg=4961.69ms, p95=6548.36ms, ok=324, fail=0 | during avg=4711.77ms, p95=18056.92ms, ok=912, fail=125
+health     | baseline avg=3019.23ms, p95=3972.53ms, ok=21, fail=0 | during avg=3508.75ms, p95=3695.59ms, ok=51, fail=4
+============================================================
