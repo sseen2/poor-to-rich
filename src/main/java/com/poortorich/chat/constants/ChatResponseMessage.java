@@ -5,6 +5,7 @@ public class ChatResponseMessage {
     public static final String CREATE_CHATROOM_SUCCESS = "채팅방을 성공적으로 추가했습니다.";
     public static final String GET_CHATROOM_SUCCESS = "채팅방을 성공적으로 조회했습니다.";
     public static final String GET_ALL_CHATROOMS_SUCCESS = "전체 채팅방 목록 조회가 완료되었습니다.";
+    public static final String RECONCILE_CHATROOM_SUMMARY_SUCCESS = "채팅방 summary 정합성 보정이 완료되었습니다.";
     public static final String CURSOR_INVALID = "유효하지 않은 커서입니다.";
     public static final String GET_SEARCH_CHATROOMS_SUCCESS = "채팅방 검색이 완료되었습니다.";
     public static final String GET_HOSTED_CHATROOMS_SUCCESS = "나의 채팅방 목록 조회가 완료되었습니다.";

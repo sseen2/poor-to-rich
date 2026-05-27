@@ -75,8 +75,32 @@ public class ChatroomSummary {
                 .build();
     }
 
+    public static ChatroomSummary createForReconcile(
+            Chatroom chatroom,
+            LocalDateTime createdAt,
+            LocalDateTime lastMessageAt,
+            Long likeCount,
+            Long participantCount,
+            Boolean isClosed
+    ) {
+        LocalDateTime resolvedCreatedAt = createdAt == null ? LocalDateTime.now() : createdAt;
+
+        return ChatroomSummary.builder()
+                .chatroom(chatroom)
+                .createdAt(resolvedCreatedAt)
+                .lastMessageAt(lastMessageAt == null ? resolvedCreatedAt : lastMessageAt)
+                .likeCount(likeCount)
+                .participantCount(participantCount)
+                .isClosed(isClosed)
+                .build();
+    }
+
     public void updateLastMessageAt(LocalDateTime lastMessageAt) {
         this.lastMessageAt = lastMessageAt;
+    }
+
+    public void updateCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
     }
 
     public void updateLikeCount(Long likeCount) {
@@ -85,6 +109,10 @@ public class ChatroomSummary {
 
     public void updateParticipantCount(Long participantCount) {
         this.participantCount = participantCount;
+    }
+
+    public void updateClosedStatus(Boolean isClosed) {
+        this.isClosed = isClosed;
     }
 
     public void close() {

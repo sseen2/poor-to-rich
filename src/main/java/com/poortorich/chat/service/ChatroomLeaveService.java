@@ -4,6 +4,7 @@ import com.poortorich.chat.entity.ChatParticipant;
 import com.poortorich.chat.entity.Chatroom;
 import com.poortorich.chat.entity.enums.ChatroomRole;
 import com.poortorich.chat.entity.enums.NoticeStatus;
+import com.poortorich.chat.event.summary.ChatroomParticipantCountUpdatedEvent;
 import com.poortorich.chat.realtime.event.chatroom.ChatroomUpdateEvent;
 import com.poortorich.chat.realtime.payload.response.ChatroomClosedResponsePayload;
 import com.poortorich.chat.realtime.payload.response.UserLeaveResponsePayload;
@@ -29,7 +30,6 @@ public class ChatroomLeaveService {
     private final TagService tagService;
     private final ChatMessageService chatMessageService;
     private final ChatroomService chatroomService;
-    private final ChatroomSummaryService chatroomSummaryService;
     private final ChatParticipantService participantService;
 
     private final ChatroomLeaveManager leaveManager;
@@ -54,10 +54,7 @@ public class ChatroomLeaveService {
         if (ChatroomRole.HOST.equals(participant.getRole())) {
             deleteChatroom(participant.getChatroom());
         } else {
-            chatroomSummaryService.updateParticipantCount(
-                    participant.getChatroom(),
-                    participantService.countByChatroom(participant.getChatroom())
-            );
+            publishParticipantCountUpdatedEvent(participant.getChatroom());
         }
         eventPublisher.publishEvent(new ChatroomUpdateEvent(
                 participant.getChatroom(),
@@ -95,5 +92,12 @@ public class ChatroomLeaveService {
         tagService.deleteAllByChatroom(chatroom);
         chatMessageService.closeAllMessagesByChatroom(chatroom);
         chatroomService.closeChatroomById(chatroom.getId());
+    }
+
+    private void publishParticipantCountUpdatedEvent(Chatroom chatroom) {
+        eventPublisher.publishEvent(new ChatroomParticipantCountUpdatedEvent(
+                chatroom.getId(),
+                participantService.countByChatroom(chatroom)
+        ));
     }
 }

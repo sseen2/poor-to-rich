@@ -74,6 +74,13 @@ public class ChatController {
         return DataResponse.toResponseEntity(HttpStatus.OK, message, chatFacade.getAllChatrooms(sortBy, cursor));
     }
 
+    @PostMapping("/summary/reconcile")
+    public ResponseEntity<BaseResponse> reconcileChatroomSummary() {
+        chatFacade.reconcileChatroomSummary();
+
+        return BaseResponse.toResponseEntity(ChatResponse.RECONCILE_CHATROOM_SUMMARY_SUCCESS);
+    }
+
     @GetMapping("/search")
     public ResponseEntity<BaseResponse> searchChatrooms(@RequestParam String keyword) {
         return DataResponse.toResponseEntity(

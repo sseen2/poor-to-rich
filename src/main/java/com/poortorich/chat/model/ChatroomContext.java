@@ -1,5 +1,6 @@
 package com.poortorich.chat.model;
 
+import com.poortorich.chat.entity.Chatroom;
 import java.util.List;
 import lombok.Builder;
 import lombok.Getter;
@@ -8,12 +9,13 @@ import lombok.Getter;
 @Builder
 public class ChatroomContext {
 
-    List<Long> chatroomIds;
+    List<Chatroom> chatrooms;
     List<String> lastMessageTimes;
+    List<Long> participantCounts;
     Boolean hasNext;
     String nextCursor;
 
     public boolean isEmpty() {
-        return chatroomIds == null || chatroomIds.isEmpty();
+        return chatrooms == null || chatrooms.isEmpty();
     }
 }

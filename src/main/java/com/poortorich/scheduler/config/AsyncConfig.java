@@ -28,4 +28,15 @@ public class AsyncConfig {
         executor.initialize();
         return executor;
     }
+
+    @Bean(name = "chatroomSummaryTaskExecutor")
+    public TaskExecutor chatroomSummaryTaskExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(4);
+        executor.setQueueCapacity(1000);
+        executor.setThreadNamePrefix("chatroom-summary-");
+        executor.initialize();
+        return executor;
+    }
 }

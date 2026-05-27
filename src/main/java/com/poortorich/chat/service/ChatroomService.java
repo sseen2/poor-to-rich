@@ -10,7 +10,6 @@ import com.poortorich.chat.response.enums.ChatResponse;
 import com.poortorich.chat.util.ChatBuilder;
 import com.poortorich.global.exceptions.NotFoundException;
 import com.poortorich.user.entity.User;
-import java.util.Comparator;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -32,12 +31,6 @@ public class ChatroomService {
 
     public ChatroomContext getAllChatrooms(SortBy sortBy, String cursor) {
         return chatroomSummaryService.getChatroomContext(sortBy, cursor, 20);
-    }
-
-    public List<Chatroom> findByIds(List<Long> chatroomIds) {
-        List<Chatroom> chatrooms = chatroomRepository.findAllByIdInAndIsClosedFalse(chatroomIds);
-        chatrooms.sort(Comparator.comparingInt(c -> chatroomIds.indexOf(c.getId())));
-        return chatrooms;
     }
 
     public Chatroom findById(Long chatroomId) {

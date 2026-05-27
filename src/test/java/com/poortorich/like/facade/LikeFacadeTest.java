@@ -1,19 +1,21 @@
 package com.poortorich.like.facade;
 
 import com.poortorich.chat.entity.Chatroom;
+import com.poortorich.chat.event.summary.ChatroomLikeCountUpdatedEvent;
 import com.poortorich.chat.service.ChatroomService;
-import com.poortorich.chat.service.ChatroomSummaryService;
 import com.poortorich.like.request.LikeUpdateRequest;
 import com.poortorich.like.response.LikeStatusResponse;
 import com.poortorich.like.service.LikeService;
 import com.poortorich.user.entity.User;
 import com.poortorich.user.service.UserService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
@@ -27,12 +29,16 @@ class LikeFacadeTest {
     @Mock
     private ChatroomService chatroomService;
     @Mock
-    private ChatroomSummaryService chatroomSummaryService;
-    @Mock
     private LikeService likeService;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
-    @InjectMocks
     private LikeFacade likeFacade;
+
+    @BeforeEach
+    void setUp() {
+        likeFacade = new LikeFacade(userService, chatroomService, likeService, eventPublisher);
+    }
 
     @Test
     @DisplayName("채팅방 좋아요 상태 조회 성공")
@@ -71,7 +77,11 @@ class LikeFacadeTest {
         LikeStatusResponse result = likeFacade.updateChatroomLike(username, chatroomId, request);
 
         verify(likeService).updateLikeStatus(user, chatroom, request.getIsLiked());
-        verify(chatroomSummaryService).updateLikeCount(chatroom, 3L);
+        ArgumentCaptor<ChatroomLikeCountUpdatedEvent> eventCaptor = ArgumentCaptor.forClass(
+                ChatroomLikeCountUpdatedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().chatroomId()).isEqualTo(chatroomId);
+        assertThat(eventCaptor.getValue().likeCount()).isEqualTo(3L);
         assertThat(result).isNotNull();
         assertThat(result.getIsLiked()).isTrue();
         assertThat(result.getLikeCount()).isEqualTo(3L);

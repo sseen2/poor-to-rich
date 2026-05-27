@@ -3,6 +3,7 @@ package com.poortorich.chat.repository;
 import com.poortorich.chat.entity.Chatroom;
 import com.poortorich.chat.entity.enums.ChatroomRole;
 import com.poortorich.user.entity.User;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,7 +14,7 @@ import java.util.List;
 @Repository
 public interface ChatroomRepository extends JpaRepository<Chatroom, Long> {
 
-    List<Chatroom> findAllByIdInAndIsClosedFalse(List<Long> chatroomIds);
+    List<Chatroom> findByIdGreaterThanOrderByIdAsc(Long id, Pageable pageable);
 
     @Query("""
                 SELECT c

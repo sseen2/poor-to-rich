@@ -1,15 +1,17 @@
 package com.poortorich.like.facade;
 
 import com.poortorich.chat.entity.Chatroom;
+import com.poortorich.chat.event.summary.ChatroomLikeCountUpdatedEvent;
 import com.poortorich.like.request.LikeUpdateRequest;
 import com.poortorich.like.response.LikeStatusResponse;
 import com.poortorich.chat.service.ChatroomService;
-import com.poortorich.chat.service.ChatroomSummaryService;
 import com.poortorich.like.service.LikeService;
 import com.poortorich.user.entity.User;
 import com.poortorich.user.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -17,8 +19,8 @@ public class LikeFacade {
 
     private final UserService userService;
     private final ChatroomService chatroomService;
-    private final ChatroomSummaryService chatroomSummaryService;
     private final LikeService likeService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public LikeStatusResponse getChatroomLike(String username, Long chatroomId) {
         User user = userService.findUserByUsername(username);
@@ -27,6 +29,7 @@ public class LikeFacade {
         return buildLikeStatusResponse(user, chatroom);
     }
 
+    @Transactional
     public LikeStatusResponse updateChatroomLike(
             String username,
             Long chatroomId,
@@ -36,7 +39,7 @@ public class LikeFacade {
         Chatroom chatroom = chatroomService.findById(chatroomId);
         likeService.updateLikeStatus(user, chatroom, request.getIsLiked());
         Long likeCount = likeService.getLikeCount(chatroom);
-        chatroomSummaryService.updateLikeCount(chatroom, likeCount);
+        eventPublisher.publishEvent(new ChatroomLikeCountUpdatedEvent(chatroom.getId(), likeCount));
 
         return buildLikeStatusResponse(user, chatroom, likeCount);
     }

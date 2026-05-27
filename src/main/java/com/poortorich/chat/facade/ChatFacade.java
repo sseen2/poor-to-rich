@@ -4,6 +4,7 @@ import com.poortorich.chat.entity.ChatMessage;
 import com.poortorich.chat.entity.ChatParticipant;
 import com.poortorich.chat.entity.Chatroom;
 import com.poortorich.chat.entity.enums.ChatroomRole;
+import com.poortorich.chat.event.summary.ChatroomParticipantCountUpdatedEvent;
 import com.poortorich.chat.model.ChatMessageResponse;
 import com.poortorich.chat.model.ChatPaginationContext;
 import com.poortorich.chat.model.ChatroomContext;
@@ -134,18 +135,24 @@ public class ChatFacade {
             return getAllChatroomsResponseEmptyChatroom();
         }
 
-        List<Chatroom> chatrooms = chatroomService.findByIds(chatroomContext.getChatroomIds());
-        List<Long> chatroomIds = chatroomContext.getChatroomIds();
+        List<Chatroom> chatrooms = chatroomContext.getChatrooms();
+        List<Long> chatroomIds = chatrooms.stream()
+                .map(Chatroom::getId)
+                .toList();
         List<String> lastMessageTimes = chatroomContext.getLastMessageTimes();
+        List<Long> participantCounts = chatroomContext.getParticipantCounts();
 
         Map<Long, String> lastMessageTimeMap = IntStream.range(0, chatroomIds.size())
                 .boxed()
                 .collect(Collectors.toMap(chatroomIds::get, lastMessageTimes::get));
+        Map<Long, Long> participantCountMap = IntStream.range(0, chatroomIds.size())
+                .boxed()
+                .collect(Collectors.toMap(chatroomIds::get, participantCounts::get));
 
         return AllChatroomsResponse.builder()
                 .hasNext(chatroomContext.getHasNext())
                 .nextCursor(chatroomContext.getNextCursor())
-                .chatrooms(getChatroomResponses(chatrooms, lastMessageTimeMap))
+                .chatrooms(getChatroomResponses(chatrooms, lastMessageTimeMap, participantCountMap))
                 .build();
     }
 
@@ -155,6 +162,10 @@ public class ChatFacade {
                 .nextCursor(null)
                 .chatrooms(List.of())
                 .build();
+    }
+
+    public void reconcileChatroomSummary() {
+        chatroomSummaryService.reconcileSummaries();
     }
 
     public ChatroomsResponse searchChatrooms(String keyword) {
@@ -181,9 +192,18 @@ public class ChatFacade {
 
     private List<ChatroomResponse> getChatroomResponses(List<Chatroom> chatrooms, Map<Long, String> lastMessageTimeMap) {
         List<Long> chatroomIds = chatrooms.stream().map(Chatroom::getId).toList();
-        Map<Long, List<String>> tagMap = tagService.getTagNamesByChatroomIds(chatroomIds);
         Map<Long, Long> participantCountMap = chatParticipantService.countByChatroomIds(chatroomIds);
 
+        return getChatroomResponses(chatrooms, lastMessageTimeMap, participantCountMap);
+    }
+
+    private List<ChatroomResponse> getChatroomResponses(
+            List<Chatroom> chatrooms,
+            Map<Long, String> lastMessageTimeMap,
+            Map<Long, Long> participantCountMap
+    ) {
+        List<Long> chatroomIds = chatrooms.stream().map(Chatroom::getId).toList();
+        Map<Long, List<String>> tagMap = tagService.getTagNamesByChatroomIds(chatroomIds);
         return chatrooms.stream()
                 .filter(Objects::nonNull)
                 .map(chatroom -> {
@@ -250,7 +270,7 @@ public class ChatFacade {
         chatroomValidator.validatePassword(chatroom, chatroomEnterRequest.getChatroomPassword());
 
         ChatParticipant newParticipant = chatParticipantService.enterUser(user, chatroom);
-        chatroomSummaryService.updateParticipantCount(chatroom, chatParticipantService.countByChatroom(chatroom));
+        publishParticipantCountUpdatedEvent(chatroom);
 
         eventPublisher.publishEvent(new ChatroomUpdateEvent(chatroom, PayloadType.CHATROOM_INFO_UPDATED));
         return UserEnterChatroomResult.builder()
@@ -441,15 +461,19 @@ public class ChatFacade {
 
         eventPublisher.publishEvent(new KickChatroomEvent(kickChatParticipant.getId()));
         chatParticipantService.kickChatParticipant(kickChatParticipant);
-        chatroomSummaryService.updateParticipantCount(
-                host.getChatroom(),
-                chatParticipantService.countByChatroom(host.getChatroom())
-        );
+        publishParticipantCountUpdatedEvent(host.getChatroom());
 
         eventPublisher.publishEvent(new ChatroomUpdateEvent(host.getChatroom(), PayloadType.CHATROOM_INFO_UPDATED));
         return KickChatParticipantResponse.builder()
                 .kickUserId(kickChatParticipant.getUser().getId())
                 .kickChatParticipant(kickChatParticipant)
                 .build();
+    }
+
+    private void publishParticipantCountUpdatedEvent(Chatroom chatroom) {
+        eventPublisher.publishEvent(new ChatroomParticipantCountUpdatedEvent(
+                chatroom.getId(),
+                chatParticipantService.countByChatroom(chatroom)
+        ));
     }
 }

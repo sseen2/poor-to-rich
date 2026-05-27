@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
 
 import lombok.AccessLevel;
@@ -28,7 +29,16 @@ import org.hibernate.annotations.UpdateTimestamp;
 @DynamicUpdate
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "likes")
+@Table(
+        name = "likes",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_likes_user_chatroom",
+                        columnNames = {"user_id", "chatroom_id"}
+                )
+        }
+)
+
 public class Like {
 
     @Id

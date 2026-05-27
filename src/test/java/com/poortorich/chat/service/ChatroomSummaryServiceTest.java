@@ -1,15 +1,17 @@
 package com.poortorich.chat.service;
 
-import com.poortorich.chat.entity.ChatMessage;
 import com.poortorich.chat.entity.Chatroom;
 import com.poortorich.chat.entity.ChatroomSummary;
 import com.poortorich.chat.entity.enums.ChatMessageType;
 import com.poortorich.chat.model.ChatroomContext;
+import com.poortorich.chat.repository.ChatMessageRepository;
+import com.poortorich.chat.repository.ChatParticipantRepository;
+import com.poortorich.chat.repository.ChatroomRepository;
 import com.poortorich.chat.repository.ChatroomSummaryRepository;
 import com.poortorich.chat.request.enums.SortBy;
+import com.poortorich.like.repository.LikeRepository;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,8 +19,11 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -28,6 +33,16 @@ class ChatroomSummaryServiceTest {
 
     @Mock
     private ChatroomSummaryRepository chatroomSummaryRepository;
+    @Mock
+    private ChatroomRepository chatroomRepository;
+    @Mock
+    private ChatMessageRepository chatMessageRepository;
+    @Mock
+    private ChatParticipantRepository chatParticipantRepository;
+    @Mock
+    private LikeRepository likeRepository;
+    @Mock
+    private TransactionTemplate transactionTemplate;
 
     @InjectMocks
     private ChatroomSummaryService chatroomSummaryService;
@@ -44,7 +59,10 @@ class ChatroomSummaryServiceTest {
 
         ChatroomContext result = chatroomSummaryService.getChatroomContext(SortBy.CREATED_AT, "-1", 2);
 
-        assertThat(result.getChatroomIds()).containsExactly(3L, 2L);
+        assertThat(result.getChatrooms())
+                .extracting(Chatroom::getId)
+                .containsExactly(3L, 2L);
+        assertThat(result.getParticipantCounts()).containsExactly(1L, 1L);
         assertThat(result.getHasNext()).isTrue();
         assertThat(result.getNextCursor()).isEqualTo("2");
     }
@@ -64,7 +82,10 @@ class ChatroomSummaryServiceTest {
                 2
         );
 
-        assertThat(result.getChatroomIds()).containsExactly(1L);
+        assertThat(result.getChatrooms())
+                .extracting(Chatroom::getId)
+                .containsExactly(1L);
+        assertThat(result.getParticipantCounts()).containsExactly(1L);
         assertThat(result.getHasNext()).isFalse();
         assertThat(result.getNextCursor()).isEqualTo("2026-01-01T00:00,1");
     }
@@ -79,7 +100,10 @@ class ChatroomSummaryServiceTest {
 
         ChatroomContext result = chatroomSummaryService.getChatroomContext(SortBy.LIKE, "10,5,2", 2);
 
-        assertThat(result.getChatroomIds()).containsExactly(1L);
+        assertThat(result.getChatrooms())
+                .extracting(Chatroom::getId)
+                .containsExactly(1L);
+        assertThat(result.getParticipantCounts()).containsExactly(3L);
         assertThat(result.getHasNext()).isFalse();
         assertThat(result.getNextCursor()).isEqualTo("7,3,1");
     }
@@ -89,28 +113,16 @@ class ChatroomSummaryServiceTest {
     void updateLastMessageSuccess() {
         Chatroom chatroom = Chatroom.builder().id(1L).build();
         LocalDateTime sentAt = LocalDateTime.of(2026, 1, 1, 12, 0);
-        ChatroomSummary summary = createSummary(1L, LocalDateTime.of(2026, 1, 1, 0, 0), 0L, 1L);
-        ChatMessage message = ChatMessage.builder()
-                .chatroom(chatroom)
-                .type(ChatMessageType.CHAT_MESSAGE)
-                .sentAt(sentAt)
-                .build();
 
-        when(chatroomSummaryRepository.findByChatroom(chatroom)).thenReturn(Optional.of(summary));
+        chatroomSummaryService.updateLastMessage(chatroom.getId(), ChatMessageType.CHAT_MESSAGE, sentAt);
 
-        chatroomSummaryService.updateLastMessage(message);
-
-        assertThat(summary.getLastMessageAt()).isEqualTo(sentAt);
+        verify(chatroomSummaryRepository).updateLastMessageAt(chatroom.getId(), sentAt);
     }
 
     @Test
     @DisplayName("목록 정렬 대상이 아닌 메시지는 summary를 갱신하지 않는다")
     void updateLastMessageIgnoreNotOrderingMessage() {
-        ChatMessage message = ChatMessage.builder()
-                .type(ChatMessageType.SYSTEM_MESSAGE)
-                .build();
-
-        chatroomSummaryService.updateLastMessage(message);
+        chatroomSummaryService.updateLastMessage(1L, ChatMessageType.SYSTEM_MESSAGE, LocalDateTime.now());
 
         verifyNoInteractions(chatroomSummaryRepository);
     }
@@ -127,6 +139,76 @@ class ChatroomSummaryServiceTest {
         chatroomSummaryService.createSummary(chatroom, 1L);
 
         verify(chatroomSummaryRepository).save(org.mockito.ArgumentMatchers.any(ChatroomSummary.class));
+    }
+
+    @Test
+    @DisplayName("summary 정합성 보정 시 누락 생성 후 원본 기준으로 갱신한다")
+    void reconcileSummariesSuccess() {
+        PageRequest pageRequest = PageRequest.of(0, 1000);
+        LocalDateTime firstCreatedAt = LocalDateTime.of(2026, 1, 1, 0, 0);
+        LocalDateTime secondCreatedAt = LocalDateTime.of(2026, 1, 2, 0, 0);
+        LocalDateTime firstLastMessageAt = LocalDateTime.of(2026, 1, 1, 12, 0);
+        LocalDateTime secondLastMessageAt = LocalDateTime.of(2026, 1, 2, 12, 0);
+        Chatroom firstChatroom = Chatroom.builder()
+                .id(1L)
+                .createdDate(firstCreatedAt)
+                .isClosed(false)
+                .build();
+        Chatroom secondChatroom = Chatroom.builder()
+                .id(2L)
+                .createdDate(secondCreatedAt)
+                .isClosed(false)
+                .build();
+        ChatroomSummary secondSummary = ChatroomSummary.builder()
+                .chatroom(secondChatroom)
+                .createdAt(secondCreatedAt)
+                .lastMessageAt(secondCreatedAt)
+                .likeCount(0L)
+                .participantCount(1L)
+                .isClosed(false)
+                .build();
+
+        when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(null);
+        });
+        when(chatroomRepository.findByIdGreaterThanOrderByIdAsc(0L, pageRequest))
+                .thenReturn(List.of(firstChatroom, secondChatroom));
+        when(chatroomRepository.findByIdGreaterThanOrderByIdAsc(2L, pageRequest))
+                .thenReturn(List.of());
+        when(chatroomSummaryRepository.findByChatroom_IdIn(List.of(1L, 2L)))
+                .thenReturn(List.of(secondSummary));
+        when(chatMessageRepository.findLastMessageTimesByChatroomIds(
+                List.of(1L, 2L),
+                List.of(ChatMessageType.CHAT_MESSAGE, ChatMessageType.RANKING_MESSAGE)
+        )).thenReturn(List.of(
+                new Object[]{1L, firstLastMessageAt},
+                new Object[]{2L, secondLastMessageAt}
+        ));
+        when(likeRepository.countByChatroomIds(List.of(1L, 2L)))
+                .thenReturn(List.of(
+                        new Object[]{1L, 3L},
+                        new Object[]{2L, 5L}
+                ));
+        when(chatParticipantRepository.countParticipantsByChatroomIds(List.of(1L, 2L)))
+                .thenReturn(List.of(
+                        new Object[]{1L, 2L},
+                        new Object[]{2L, 4L}
+                ));
+
+        chatroomSummaryService.reconcileSummaries();
+
+        verify(chatroomSummaryRepository).saveAll(org.mockito.ArgumentMatchers.argThat(summaries -> {
+            List<ChatroomSummary> savedSummaries = (List<ChatroomSummary>) summaries;
+            return savedSummaries.size() == 1
+                    && savedSummaries.getFirst().getChatroom().getId().equals(1L)
+                    && savedSummaries.getFirst().getLastMessageAt().equals(firstLastMessageAt)
+                    && savedSummaries.getFirst().getLikeCount().equals(3L)
+                    && savedSummaries.getFirst().getParticipantCount().equals(2L);
+        }));
+        assertThat(secondSummary.getLastMessageAt()).isEqualTo(secondLastMessageAt);
+        assertThat(secondSummary.getLikeCount()).isEqualTo(5L);
+        assertThat(secondSummary.getParticipantCount()).isEqualTo(4L);
     }
 
     private ChatroomSummary createSummary(
