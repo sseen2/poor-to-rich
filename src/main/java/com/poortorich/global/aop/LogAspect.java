@@ -20,18 +20,31 @@ import java.util.Map;
 @Component
 public class LogAspect {
 
-    @Pointcut("execution(* com.poortorich..*.*(..)) && " +
-            "!execution(* com.poortorich.global..*(..)) && " +
-            "!execution(* com.poortorich.security..*(..))")
-    public void all() {
+    @Pointcut("within(com.poortorich..facade..*) || within(com.poortorich..service..*)")
+    public void facadeAndService() {
     }
 
     @Pointcut("execution(* com.poortorich..controller..*(..))")
     public void controller() {
     }
 
-    @Around("all()")
-    public Object logging(ProceedingJoinPoint joinPoint) throws Throwable {
+    @Around("facadeAndService()")
+    public Object logFacadeAndService(ProceedingJoinPoint joinPoint) throws Throwable {
+        return executeWithMethodLogging(joinPoint);
+    }
+
+    @Around("controller()")
+    public Object logController(ProceedingJoinPoint joinPoint) throws Throwable {
+        log.info("--- Request Start ---");
+        try {
+            logRequestInfo();
+            return executeWithMethodLogging(joinPoint);
+        } finally {
+            log.info("--- Request End ---");
+        }
+    }
+
+    private Object executeWithMethodLogging(ProceedingJoinPoint joinPoint) throws Throwable {
         String className = joinPoint.getSignature().getDeclaringType().getSimpleName();
         String methodName = joinPoint.getSignature().getName();
         log.info("[START] [{}] {}", className, methodName);
@@ -43,47 +56,24 @@ public class LogAspect {
             log.error("[ERROR] [{}] {} : {}", className, methodName, e.getMessage());
             throw e;
         } finally {
-            long end = System.currentTimeMillis();
-            long timeInMs = end - start;
+            long timeInMs = System.currentTimeMillis() - start;
             log.info("[END] [{}] {} | {}ms", className, methodName, timeInMs);
         }
     }
 
-    @Around("controller()")
-    public Object loggingBefore(ProceedingJoinPoint joinPoint) throws Throwable {
+    private void logRequestInfo() {
         RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
         if (!(requestAttributes instanceof ServletRequestAttributes servletRequestAttributes)) {
-            return joinPoint.proceed();
+            return;
         }
+
         HttpServletRequest request = servletRequestAttributes.getRequest();
-
-        String controllerName = joinPoint.getSignature().getDeclaringType().getName();
-        String methodName = joinPoint.getSignature().getName();
-        Map<String, Object> params = new HashMap<>();
-
-        try {
-            params.put("controller", controllerName);
-            params.put("method", methodName);
-            params.put("params", getParams(request));
-            params.put("log_time", System.currentTimeMillis());
-            params.put("request_uri", request.getRequestURI());
-            params.put("http_method", request.getMethod());
-        } catch (Exception e) {
-            log.error("[ERROR] : {}", e.getMessage());
-        }
-
-        String ip = request.getRemoteAddr();
-
-        log.info("");
-        log.info("[REQUEST] [{}] {}", params.get("http_method"), params.get("request_uri"));
-        log.info("[METHOD] {}.{}", params.get("controller") ,params.get("method"));
-        log.info("[PARAMS] {}", params.get("params"));
-        log.info("[IP] {}", ip);
-
-        return joinPoint.proceed();
+        log.info("[REQUEST] [{}] {}", request.getMethod(), request.getRequestURI());
+        log.info("[PARAMS] {}", getParams(request));
+        log.info("[IP] {}", request.getRemoteAddr());
     }
 
-    private Object getParams(HttpServletRequest request) {
+    private Map<String, String> getParams(HttpServletRequest request) {
         Map<String, String> paramMap = new HashMap<>();
         Enumeration<String> params = request.getParameterNames();
         while (params.hasMoreElements()) {
