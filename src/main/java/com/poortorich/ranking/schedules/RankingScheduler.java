@@ -3,7 +3,7 @@ package com.poortorich.ranking.schedules;
 import com.poortorich.chat.entity.Chatroom;
 import com.poortorich.chat.service.ChatroomService;
 import com.poortorich.ranking.facade.RankingFacade;
-import com.poortorich.ranking.payload.response.RankingResponsePayload;
+import com.poortorich.ranking.model.BatchRankingResult;
 import com.poortorich.websocket.stomp.command.subscribe.endpoint.SubscribeEndpoint;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,6 +19,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Slf4j
 @Component
@@ -29,19 +30,22 @@ public class RankingScheduler {
     private final ChatroomService chatroomService;
     private final TaskExecutor taskExecutor;
     private final int batchSize;
+    private final int taskExecutorMaxPoolSize;
 
     public RankingScheduler(
             RankingFacade rankingFacade,
             SimpMessagingTemplate messagingTemplate,
             ChatroomService chatroomService,
             @Qualifier("rankingTaskExecutor") TaskExecutor taskExecutor,
-            @Value("${ranking.scheduler.batch-size}") int batchSize
+            @Value("${ranking.scheduler.batch-size}") int batchSize,
+            @Value("${ranking.task-executor.max-pool-size}") int taskExecutorMaxPoolSize
     ) {
         this.rankingFacade = rankingFacade;
         this.messagingTemplate = messagingTemplate;
         this.chatroomService = chatroomService;
         this.taskExecutor = taskExecutor;
         this.batchSize = batchSize;
+        this.taskExecutorMaxPoolSize = taskExecutorMaxPoolSize;
     }
 
     // 랭킹 집계 스케줄러
@@ -60,32 +64,31 @@ public class RankingScheduler {
                 .stream()
                 .toList();
 
-        log.info(
-                "랭킹 집계 스케줄러 시작: chatroomCount={}, batchSize={}, batchCount={}",
-                activeChatrooms.size(),
-                batchSize,
-                batches.size()
-        );
-
         if (batches.isEmpty()) {
             log.info("랭킹 집계 스케줄러 종료: 처리할 채팅방이 없습니다.");
             return;
         }
 
-        AtomicInteger batchIndex = new AtomicInteger();
+        int workerCount = Math.min(taskExecutorMaxPoolSize, batches.size());
+        AtomicInteger nextBatchIndex = new AtomicInteger();
         AtomicInteger successCount = new AtomicInteger();
         AtomicInteger failureCount = new AtomicInteger();
         AtomicLong skippedCount = new AtomicLong();
 
-        // 하나의 배치를 하나의 스레드에서 비동기로 처리
-        List<CompletableFuture<Void>> futures = batches.stream()
-                .map(batch -> {
-                    int currentBatchIndex = batchIndex.incrementAndGet();
-                    return CompletableFuture.runAsync(
-                            () -> processBatch(currentBatchIndex, batch, successCount, failureCount, skippedCount),
-                            taskExecutor
-                    );
-                })
+        log.info(
+                "랭킹 집계 스케줄러 시작: chatroomCount={}, batchSize={}, batchCount={}, workerCount={}",
+                activeChatrooms.size(),
+                batchSize,
+                batches.size(),
+                workerCount
+        );
+
+        // executor 큐에 전체 배치를 한 번에 넣지 않고, worker가 다음 배치를 하나씩 가져가며 처리한다.
+        List<CompletableFuture<Void>> futures = IntStream.rangeClosed(1, workerCount)
+                .mapToObj(workerIndex -> CompletableFuture.runAsync(
+                        () -> processBatches(workerIndex, batches, nextBatchIndex, successCount, failureCount, skippedCount),
+                        taskExecutor
+                ))
                 .toList();
 
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
@@ -100,9 +103,10 @@ public class RankingScheduler {
                     }
 
                     log.info(
-                            "랭킹 집계 스케줄러 전체 종료: chatroomCount={}, batchCount={}, success={}, skipped={}, failure={}, elapsedMs={}",
+                            "랭킹 집계 스케줄러 전체 종료: chatroomCount={}, batchCount={}, workerCount={}, success={}, skipped={}, failure={}, elapsedMs={}",
                             activeChatrooms.size(),
                             batches.size(),
+                            workerCount,
                             successCount.get(),
                             skippedCount.get(),
                             failureCount.get(),
@@ -111,10 +115,36 @@ public class RankingScheduler {
                 });
 
         log.info(
-                "랭킹 집계 스케줄러 작업 제출 완료: batchCount={}, elapsedMs={}",
+                "랭킹 집계 스케줄러 작업 제출 완료: batchCount={}, workerCount={}, elapsedMs={}",
                 batches.size(),
+                workerCount,
                 elapsedMillis(startedAt)
         );
+    }
+
+    private void processBatches(
+            int workerIndex,
+            List<List<Chatroom>> batches,
+            AtomicInteger nextBatchIndex,
+            AtomicInteger successCount,
+            AtomicInteger failureCount,
+            AtomicLong skippedCount
+    ) {
+        while (true) {
+            int currentBatchIndex = nextBatchIndex.getAndIncrement();
+            if (currentBatchIndex >= batches.size()) {
+                log.info("랭킹 집계 worker 종료: workerIndex={}", workerIndex);
+                return;
+            }
+
+            processBatch(
+                    currentBatchIndex + 1,
+                    batches.get(currentBatchIndex),
+                    successCount,
+                    failureCount,
+                    skippedCount
+            );
+        }
     }
 
     private void processBatch(
@@ -135,13 +165,28 @@ public class RankingScheduler {
                 chatrooms.size()
         );
 
-        chatrooms.forEach(chatroom -> processChatroom(
-                batchIndex,
-                chatroom,
-                batchSuccessCount,
-                batchFailureCount,
-                batchSkippedCount
-        ));
+        try {
+            List<BatchRankingResult> rankingResults = rankingFacade.calculateRankings(chatrooms);
+            rankingResults.forEach(result -> {
+                messagingTemplate.convertAndSend(
+                        SubscribeEndpoint.CHATROOM_SUBSCRIBE_PREFIX + result.chatroom().getId(),
+                        result.payload().mapToBasePayload()
+                );
+            });
+
+            batchSuccessCount.addAndGet(rankingResults.size());
+            batchSkippedCount.addAndGet(chatrooms.size() - rankingResults.size());
+        } catch (Exception exception) {
+            batchFailureCount.addAndGet(chatrooms.size());
+            log.error(
+                    "랭킹 집계 배치 실패: batchIndex={}, batchChatroomCount={}, exceptionType={}, message={}",
+                    batchIndex,
+                    chatrooms.size(),
+                    exception.getClass().getSimpleName(),
+                    exception.getMessage(),
+                    exception
+            );
+        }
 
         successCount.addAndGet(batchSuccessCount.get());
         failureCount.addAndGet(batchFailureCount.get());
@@ -155,45 +200,6 @@ public class RankingScheduler {
                 batchFailureCount.get(),
                 elapsedMillis(batchStartedAt)
         );
-    }
-
-    private void processChatroom(
-            int batchIndex,
-            Chatroom chatroom,
-            AtomicInteger batchSuccessCount,
-            AtomicInteger batchFailureCount,
-            AtomicInteger batchSkippedCount
-    ) {
-        try {
-            RankingResponsePayload payload = rankingFacade.calculateRanking(chatroom);
-
-            if (!Objects.isNull(payload)) {
-                // 채팅방에 랭킹 데이터를 담아 메세지 전송
-                messagingTemplate.convertAndSend(
-                        SubscribeEndpoint.CHATROOM_SUBSCRIBE_PREFIX + chatroom.getId(),
-                        payload.mapToBasePayload()
-                );
-                batchSuccessCount.incrementAndGet();
-                return;
-            }
-
-            batchSkippedCount.incrementAndGet();
-            log.info(
-                    "랭킹 집계 건너뜀: batchIndex={}, chatroomId={}, reason=NOT_ENOUGH_RANKABLE_PARTICIPANTS",
-                    batchIndex,
-                    chatroom.getId()
-            );
-        } catch (Exception exception) {
-            batchFailureCount.incrementAndGet();
-            log.error(
-                    "랭킹 집계 실패: batchIndex={}, chatroomId={}, exceptionType={}, message={}",
-                    batchIndex,
-                    chatroom.getId(),
-                    exception.getClass().getSimpleName(),
-                    exception.getMessage(),
-                    exception
-            );
-        }
     }
 
     private long elapsedMillis(long startedAt) {

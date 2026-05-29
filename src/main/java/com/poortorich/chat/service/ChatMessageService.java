@@ -328,6 +328,19 @@ public class ChatMessageService {
                 .build();
     }
 
+    @Transactional
+    public List<ChatMessage> saveRankingMessages(List<Ranking> rankings) {
+        if (rankings == null || rankings.isEmpty()) {
+            return List.of();
+        }
+
+        List<ChatMessage> rankingMessages = rankings.stream()
+                .map(ranking -> RankingMessageBuilder.buildRankingMessage(ranking.getChatroom(), ranking))
+                .toList();
+
+        return chatMessageRepository.saveAll(rankingMessages);
+    }
+
     @Transactional(readOnly = true)
     public Long getLatestReadMessageId(ChatParticipant participant) {
         Long latestReadMessageId;

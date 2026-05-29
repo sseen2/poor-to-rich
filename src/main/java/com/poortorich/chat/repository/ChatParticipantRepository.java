@@ -120,6 +120,18 @@ public interface ChatParticipantRepository extends JpaRepository<ChatParticipant
     List<ChatParticipant> findAllOrderedParticipants(@Param("chatroom") Chatroom chatroom);
 
     @Query("""
+                SELECT cp
+                  FROM ChatParticipant cp
+                  JOIN FETCH cp.user u
+                  JOIN FETCH cp.chatroom c
+                 WHERE c.id IN :chatroomIds
+                   AND cp.isParticipated = true
+            """)
+    List<ChatParticipant> findAllParticipatedByChatroomIdsWithUserAndChatroom(
+            @Param("chatroomIds") List<Long> chatroomIds
+    );
+
+    @Query("""
             SELECT cp
             FROM ChatParticipant cp
             JOIN FETCH cp.user u
@@ -193,4 +205,17 @@ public interface ChatParticipantRepository extends JpaRepository<ChatParticipant
     @Modifying(clearAutomatically = true)
     @Query("UPDATE ChatParticipant cp SET cp.rankingStatus = :none WHERE cp.rankingStatus IN :statuses")
     void resetRankingStatusToNone(@Param("none") RankingStatus none, @Param("statuses") List<RankingStatus> statuses);
+
+    @Modifying(clearAutomatically = true)
+    @Query("""
+                UPDATE ChatParticipant cp
+                   SET cp.rankingStatus = :none
+                 WHERE cp.chatroom.id IN :chatroomIds
+                   AND cp.rankingStatus IN :statuses
+            """)
+    void resetRankingStatusToNoneByChatroomIds(
+            @Param("chatroomIds") List<Long> chatroomIds,
+            @Param("none") RankingStatus none,
+            @Param("statuses") List<RankingStatus> statuses
+    );
 }

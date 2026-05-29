@@ -6,6 +6,7 @@ import com.poortorich.accountbook.model.domain.PeriodAmount;
 import com.poortorich.category.entity.Category;
 import com.poortorich.expense.entity.Expense;
 import com.poortorich.expense.repository.ExpenseRepository;
+import com.poortorich.ranking.model.ChatroomUserExpenseAggregate;
 import com.poortorich.ranking.model.UserExpenseAggregate;
 import com.poortorich.user.entity.User;
 import lombok.RequiredArgsConstructor;
@@ -179,6 +180,15 @@ public class ExpenseStrategy implements AccountBookStrategy {
     @Override
     public List<UserExpenseAggregate> findExpenseAggregatesByUsersAndDateRange(List<User> users, LocalDate startDate, LocalDate endDate) {
         return expenseRepository.findExpenseAggregatesByUsersAndDateRange(users, startDate, endDate);
+    }
+
+    @Override
+    public List<ChatroomUserExpenseAggregate> findExpenseAggregatesByChatroomsAndDateRange(
+            List<Long> chatroomIds,
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
+        return expenseRepository.findExpenseAggregatesByChatroomsAndDateRange(chatroomIds, startDate, endDate);
     }
 
     @Override

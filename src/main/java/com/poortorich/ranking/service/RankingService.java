@@ -47,6 +47,14 @@ public class RankingService {
         return rankingRepository.save(ranking);
     }
 
+    public List<Ranking> saveAll(List<Ranking> rankings) {
+        if (rankings == null || rankings.isEmpty()) {
+            return List.of();
+        }
+
+        return rankingRepository.saveAll(rankings);
+    }
+
     @Transactional
     public void updateAll(List<ChatParticipant> participants, RankingStatus rankingStatus) {
         participants.forEach(participant -> participant.updateRankingStatus(rankingStatus));

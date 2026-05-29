@@ -6,6 +6,7 @@ import com.poortorich.accountbook.model.domain.DailyAmount;
 import com.poortorich.accountbook.model.domain.PeriodAmount;
 import com.poortorich.accountbook.util.strategy.AccountBookStrategyFactory;
 import com.poortorich.category.entity.Category;
+import com.poortorich.ranking.model.ChatroomUserExpenseAggregate;
 import com.poortorich.ranking.model.UserExpenseAggregate;
 import com.poortorich.user.entity.User;
 import lombok.RequiredArgsConstructor;
@@ -171,6 +172,19 @@ public class AccountBookRepository {
 
         return strategyFactory.getStrategy(AccountBookType.EXPENSE)
                 .findExpenseAggregatesByUsersAndDateRange(users, startDate, endDate);
+    }
+
+    public List<ChatroomUserExpenseAggregate> findExpenseAggregatesByChatroomsInRange(
+            List<Long> chatroomIds,
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
+        if (chatroomIds == null || chatroomIds.isEmpty()) {
+            return List.of();
+        }
+
+        return strategyFactory.getStrategy(AccountBookType.EXPENSE)
+                .findExpenseAggregatesByChatroomsAndDateRange(chatroomIds, startDate, endDate);
     }
 
     public Long sumAmountByDateAndCategory(User user, Category category, LocalDate startDate, LocalDate endDate) {

@@ -4,6 +4,7 @@ import com.poortorich.accountbook.entity.AccountBook;
 import com.poortorich.accountbook.model.domain.DailyAmount;
 import com.poortorich.accountbook.model.domain.PeriodAmount;
 import com.poortorich.category.entity.Category;
+import com.poortorich.ranking.model.ChatroomUserExpenseAggregate;
 import com.poortorich.ranking.model.UserExpenseAggregate;
 import com.poortorich.user.entity.User;
 import org.springframework.data.domain.Pageable;
@@ -65,6 +66,12 @@ public interface AccountBookStrategy {
 
     List<UserExpenseAggregate> findExpenseAggregatesByUsersAndDateRange(
             List<User> users,
+            LocalDate startDate,
+            LocalDate endDate
+    );
+
+    List<ChatroomUserExpenseAggregate> findExpenseAggregatesByChatroomsAndDateRange(
+            List<Long> chatroomIds,
             LocalDate startDate,
             LocalDate endDate
     );
