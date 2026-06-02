@@ -159,7 +159,7 @@ public class ChartController {
     ) {
         return DataResponse.toResponseEntity(
                 ChartResponse.GET_CATEGORY_VERTICAL_SUCCESS,
-                chartFacade.getCategoryVertical_stats(userDetails.getUsername(), categoryId, date)
+                chartFacade.getCategoryVertical(userDetails.getUsername(), categoryId, date)
         );
     }
 }

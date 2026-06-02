@@ -23,10 +23,12 @@ import com.poortorich.global.date.domain.DateInfo;
 import com.poortorich.global.date.domain.MonthInformation;
 import com.poortorich.global.date.domain.YearInformation;
 import com.poortorich.global.date.util.DateInfoProvider;
-import com.poortorich.stats.service.MonthlySummaryService;
 import java.time.Year;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort.Direction;
 import org.springframework.stereotype.Service;
@@ -40,7 +42,6 @@ public class ChartFacade {
     private final ChartPaginationHandler paginationHandler;
     private final ChartResponseFactory responseFactory;
     private final AccountBookService accountBookService;
-    private final MonthlySummaryService summaryService;
 
     public TotalAmountAndSavingResponse getTotalAccountBookAmountAndSaving(
             String username, String date, AccountBookType type
@@ -125,7 +126,7 @@ public class ChartFacade {
         return chartService.getCategoryVertical(yearInfo, accountBooks, monthlyAccountBooks);
     }
 
-    public CategoryVerticalResponse getCategoryVertical_query(String username, Long categoryId, String date) {
+    public CategoryVerticalResponse getCategoryVertical(String username, Long categoryId, String date) {
         if (date == null) {
             date = Year.now().toString();
         }
@@ -140,24 +141,25 @@ public class ChartFacade {
                 yearInfo.getEndDate()
         );
 
-        return chartService.getCategoryVertical(yearInfo, monthlyTotalAmounts);
+        return chartService.getCategoryVertical(yearInfo, fillMissingPeriods(monthlyTotalAmounts, yearInfo));
     }
 
-    public CategoryVerticalResponse getCategoryVertical_stats(String username, Long categoryId, String date) {
-        if (date == null) {
-            date = Year.now().toString();
-        }
+    public CategoryVerticalResponse getCategoryVertical_query(String username, Long categoryId, String date) {
+        return getCategoryVertical(username, categoryId, date);
+    }
 
-        ChartDataContext context = dataCollector.collectCategoryContext(username, categoryId, date);
-        YearInformation yearInfo = (YearInformation) context.getDateInfo();
+    private List<PeriodAmount> fillMissingPeriods(List<PeriodAmount> results, YearInformation yearInfo) {
+        Map<String, Long> periodAmountMap = results.stream()
+                .collect(Collectors.toMap(PeriodAmount::getPeriod, PeriodAmount::getTotalAmount));
 
-        List<PeriodAmount> monthlyTotalAmounts = summaryService.getPeriodAmounts(
-                context.getUser(),
-                context.getCategory(),
-                yearInfo.getStartDate(),
-                yearInfo.getEndDate()
-        );
+        YearMonth start = YearMonth.from(yearInfo.getStartDate());
+        YearMonth end = YearMonth.from(yearInfo.getEndDate());
 
-        return chartService.getCategoryVertical(yearInfo, monthlyTotalAmounts);
+        return Stream.iterate(start, date -> !date.isAfter(end), date -> date.plusMonths(1))
+                .map(date -> new PeriodAmount(
+                        date.getMonthValue() + "월",
+                        periodAmountMap.getOrDefault(date.getMonthValue() + "월", 0L)
+                ))
+                .toList();
     }
 }

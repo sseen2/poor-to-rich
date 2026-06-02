@@ -16,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.poortorich.accountbook.enums.AccountBookType;
 import com.poortorich.chart.constants.ChartResponseMessage;
 import com.poortorich.chart.facade.ChartFacade;
+import com.poortorich.chart.response.CategoryVerticalResponse;
 import com.poortorich.chart.response.TotalAmountAndSavingResponse;
 import com.poortorich.chart.response.enums.ChartResponse;
 import com.poortorich.global.config.BaseSecurityTest;
@@ -72,5 +73,34 @@ public class ChartControllerTest extends BaseSecurityTest {
 
         verify(chartFacade, times(1))
                 .getTotalAccountBookAmountAndSaving(anyString(), anyString(), any(AccountBookType.class));
+    }
+
+    @Test
+    @DisplayName("카테고리 연간 차트 조회 테스트 성공")
+    void getCategoryVertical_whenValidRequest_ShouldReturnSuccess() throws Exception {
+        CategoryVerticalResponse mockResponse = CategoryVerticalResponse.builder()
+                .period("2025-01-01 ~ 2025-12-31")
+                .totalAmount(50000L)
+                .build();
+
+        when(chartFacade.getCategoryVertical(anyString(), any(Long.class), anyString()))
+                .thenReturn(mockResponse);
+
+        ResultActions actions = mockMvc.perform(get("/chart/{categoryId}/vertical", 1L)
+                .param("date", "2025")
+                .contentType(MediaType.APPLICATION_JSON)
+                .with(user(UserFixture.VALID_USERNAME_SAMPLE_1))
+                .with(csrf()));
+
+        actions
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value(
+                        ChartResponse.GET_CATEGORY_VERTICAL_SUCCESS.getHttpStatus().value()))
+                .andExpect(jsonPath("$.message").value(ChartResponseMessage.GET_CATEGORY_VERTICAL_SUCCESS))
+                .andExpect(jsonPath("$.data.totalAmount").value(mockResponse.getTotalAmount()));
+
+        verify(chartFacade, times(1)).getCategoryVertical(anyString(), any(Long.class), anyString());
     }
 }

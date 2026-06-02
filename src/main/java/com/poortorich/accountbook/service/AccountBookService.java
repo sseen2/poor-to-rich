@@ -17,7 +17,6 @@ import com.poortorich.category.entity.Category;
 import com.poortorich.category.entity.enums.CategoryType;
 import com.poortorich.expense.response.enums.ExpenseResponse;
 import com.poortorich.global.date.domain.DateInfo;
-import com.poortorich.global.event.MonthlySummaryEvent;
 import com.poortorich.global.exceptions.NotFoundException;
 import com.poortorich.income.response.enums.IncomeResponse;
 import com.poortorich.iteration.entity.Iteration;
@@ -26,7 +25,6 @@ import com.poortorich.page.domain.Pagination;
 import com.poortorich.ranking.model.UserExpenseAggregate;
 import com.poortorich.user.entity.User;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.SliceImpl;
@@ -44,7 +42,6 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class AccountBookService {
 
-    private final ApplicationEventPublisher eventPublisher;
     private final AccountBookRepository accountBookRepository;
     private final Pagination pageProvider;
 
@@ -55,17 +52,7 @@ public class AccountBookService {
             AccountBookType type) {
         AccountBook accountBook = AccountBookBuilder.buildEntity(user, category, accountBookRequest, type);
         accountBookRepository.save(accountBook, type);
-        publishMonthlySummaryEvent(user, accountBookRequest, category);
         return accountBook;
-    }
-
-    private void publishMonthlySummaryEvent(User user, AccountBookRequest request, Category category) {
-        eventPublisher.publishEvent(new MonthlySummaryEvent(
-                user,
-                request.getCost(),
-                request.parseDate(),
-                category
-        ));
     }
 
     public List<AccountBook> createAccountBookAll(List<AccountBook> accountBooks, AccountBookType type) {
