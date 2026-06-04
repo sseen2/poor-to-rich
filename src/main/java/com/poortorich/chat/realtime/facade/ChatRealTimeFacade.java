@@ -103,7 +103,13 @@ public class ChatRealTimeFacade {
         UserChatMessagePayload chatMessage = chatMessageService
                 .saveUserChatMessage(chatParticipant, chatMembers, chatMessagePayload);
 
-        eventPublisher.publishEvent(new ChatroomUpdateEvent(chatroom, PayloadType.CHATROOM_MESSAGE_UPDATED));
+        eventPublisher.publishEvent(new ChatroomUpdateEvent(
+                chatroom,
+                PayloadType.CHATROOM_MESSAGE_UPDATED,
+                chatMessage.getMessageId(),
+                chatMessage.getContent(),
+                chatMessage.getSentAt()
+        ));
 
         return chatMessage.mapToBasePayload();
     }

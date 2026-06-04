@@ -11,6 +11,7 @@ import com.poortorich.chat.service.UnreadChatMessageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Component
@@ -43,6 +44,29 @@ public class ChatroomMapper {
                         .orElseGet(() -> contentMapper.mapToContent(participant)))
                 .lastMessageTime(lastMessage.map(ChatMessage::getSentAt)
                         .orElseGet(() -> contentMapper.mapToTime(participant)))
+                .unreadMessageCount(unreadMessageCount)
+                .build();
+    }
+
+    public MyChatroom mapToMyChatroom(
+            ChatParticipant participant,
+            String lastMessage,
+            LocalDateTime lastMessageTime,
+            Long currentMemberCount,
+            Long latestReadMessageId,
+            Long unreadMessageCount
+    ) {
+        Chatroom chatroom = participant.getChatroom();
+
+        return MyChatroom.builder()
+                .chatroomId(chatroom.getId())
+                .chatroomImage(chatroom.getImage())
+                .isHost(ChatroomRole.HOST.equals(participant.getRole()))
+                .chatroomTitle(chatroom.getTitle())
+                .currentMemberCount(currentMemberCount)
+                .latestReadMessageId(latestReadMessageId)
+                .lastMessage(lastMessage)
+                .lastMessageTime(lastMessageTime)
                 .unreadMessageCount(unreadMessageCount)
                 .build();
     }

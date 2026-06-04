@@ -1,8 +1,10 @@
 package com.poortorich.chat.repository;
 
 import com.poortorich.chat.entity.ChatMessage;
+import com.poortorich.chat.entity.ChatParticipant;
 import com.poortorich.chat.entity.Chatroom;
 import com.poortorich.chat.entity.enums.ChatMessageType;
+import com.poortorich.chat.entity.enums.ChatroomRole;
 import com.poortorich.chat.entity.enums.MessageType;
 import com.poortorich.user.entity.User;
 import org.springframework.data.domain.PageRequest;
@@ -93,6 +95,27 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             @Param("joinAt") LocalDateTime joinAt,
             @Param("bannedAt") LocalDateTime bannedAt,
             @Param("messageType") ChatMessageType messageType);
+
+    @Query("""
+            SELECT cp.id, COALESCE(MAX(CASE WHEN u.id IS NULL THEN m.id ELSE NULL END),
+                    cp.latestReadMessageId,
+                    cp.enterMessageId)
+            FROM ChatParticipant cp
+            LEFT JOIN ChatMessage m
+                ON m.chatroom = cp.chatroom
+                AND m.type = :messageType
+                AND m.sentAt >= cp.joinAt
+                AND (cp.role <> :bannedRole OR m.sentAt <= cp.bannedAt)
+            LEFT JOIN UnreadChatMessage u
+                ON u.chatMessage = m
+                AND u.user = cp.user
+            WHERE cp IN :participants
+            GROUP BY cp.id, cp.latestReadMessageId, cp.enterMessageId
+            """)
+    List<Object[]> findLatestReadMessageIdsByParticipants(
+            @Param("participants") List<ChatParticipant> participants,
+            @Param("messageType") ChatMessageType messageType,
+            @Param("bannedRole") ChatroomRole bannedRole);
 
     Optional<ChatMessage> findTopByChatroomAndTypeInAndSentAtLessThanEqualOrderByIdDesc(
             Chatroom chatroom,

@@ -16,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -71,6 +73,14 @@ public class UnreadChatMessageService {
 
     public Long countByUnreadChatMessage(User user, Chatroom chatroom) {
         return unreadChatMessageRepository.countByUserAndChatroom(user, chatroom);
+    }
+
+    public Map<Long, Long> countByUnreadChatMessages(Chatroom chatroom) {
+        return unreadChatMessageRepository.countByChatroomGroupByUser(chatroom).stream()
+                .collect(Collectors.toMap(
+                        result -> (Long) result[0],
+                        result -> (Long) result[1]
+                ));
     }
 
     @Transactional

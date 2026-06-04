@@ -50,6 +50,14 @@ public interface UnreadChatMessageRepository extends JpaRepository<UnreadChatMes
             """)
     List<UnreadChatInfo> findLastUnreadMessageIds(@Param("chatrooms") List<Chatroom> chatrooms, @Param("users") List<User> user);
 
+    @Query("""
+            SELECT u.user.id, COUNT(u)
+            FROM UnreadChatMessage u
+            WHERE u.chatroom = :chatroom
+            GROUP BY u.user.id
+            """)
+    List<Object[]> countByChatroomGroupByUser(@Param("chatroom") Chatroom chatroom);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             DELETE FROM UnreadChatMessage u

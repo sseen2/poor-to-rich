@@ -363,6 +363,19 @@ public class ChatMessageService {
         return latestReadMessageIdByChatroom;
     }
 
+    @Transactional(readOnly = true)
+    public Map<Long, Long> getLatestReadMessageIdsByParticipants(List<ChatParticipant> participants) {
+        return chatMessageRepository.findLatestReadMessageIdsByParticipants(
+                        participants,
+                        ChatMessageType.CHAT_MESSAGE,
+                        ChatroomRole.BANNED)
+                .stream()
+                .collect(Collectors.toMap(
+                        result -> (Long) result[0],
+                        result -> (Long) result[1]
+                ));
+    }
+
     @Transactional
     public void updateLatestMessageId(ChatParticipant chatParticipant) {
         Long latestMessageId = chatMessageRepository.findLatestMessageIdByChatroom(chatParticipant.getChatroom());

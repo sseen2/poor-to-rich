@@ -109,6 +109,10 @@ public class ChatParticipantService {
         return chatParticipantRepository.findAllByChatroomAndIsParticipatedTrue(chatroom);
     }
 
+    public List<ChatParticipant> findAllByChatroomWithUserAndChatroom(Chatroom chatroom) {
+        return chatParticipantRepository.findAllByChatroomWithUserAndChatroom(chatroom);
+    }
+
     public boolean isAllParticipantLeft(Chatroom chatroom) {
         List<ChatParticipant> participants = chatParticipantRepository.findAllByChatroom(chatroom);
         return participants.stream()
