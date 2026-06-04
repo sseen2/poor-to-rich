@@ -365,15 +365,20 @@ public class ChatMessageService {
 
     @Transactional(readOnly = true)
     public Map<Long, Long> getLatestReadMessageIdsByParticipants(List<ChatParticipant> participants) {
-        return chatMessageRepository.findLatestReadMessageIdsByParticipants(
+        Map<Long, Long> latestReadMessageIdByParticipant = new LinkedHashMap<>();
+        if (participants.isEmpty()) {
+            return latestReadMessageIdByParticipant;
+        }
+
+        chatMessageRepository.findLatestReadMessageIdsByParticipants(
                         participants,
                         ChatMessageType.CHAT_MESSAGE,
                         ChatroomRole.BANNED)
-                .stream()
-                .collect(Collectors.toMap(
-                        result -> (Long) result[0],
-                        result -> (Long) result[1]
-                ));
+                .forEach(result -> latestReadMessageIdByParticipant.put(
+                        (Long) result[0],
+                        (Long) result[1]));
+
+        return latestReadMessageIdByParticipant;
     }
 
     @Transactional
