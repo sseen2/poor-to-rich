@@ -1,8 +1,8 @@
 spring:
   datasource:
     hikari:
-      maximum-pool-size: 3
-      minimum-idle: 1
+      maximum-pool-size: 8
+      minimum-idle: 3
       connection-timeout: 5000
       idle-timeout: 30000
       max-lifetime: 1800000
@@ -24,10 +24,10 @@ server:
 
 ranking:
   scheduler:
-    batch-size: 200
+    batch-size: 100
   task-executor:
-    core-pool-size: 2
-    max-pool-size: 2
+    core-pool-size: 3
+    max-pool-size: 3
     queue-capacity: 100
 
 logging:
