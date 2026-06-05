@@ -33,9 +33,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void configureClientOutboundChannel(ChannelRegistration registration) {
         registration.taskExecutor()
-                .corePoolSize(4)
-                .maxPoolSize(8)
-                .queueCapacity(1000);
+                .corePoolSize(2)
+                .maxPoolSize(4)
+                .queueCapacity(200);
     }
 
     @Bean(destroyMethod = "shutdown")
