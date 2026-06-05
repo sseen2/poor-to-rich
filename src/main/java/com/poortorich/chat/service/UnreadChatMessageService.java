@@ -3,6 +3,7 @@ package com.poortorich.chat.service;
 import com.poortorich.chat.entity.ChatMessage;
 import com.poortorich.chat.entity.ChatParticipant;
 import com.poortorich.chat.entity.Chatroom;
+import com.poortorich.chat.entity.UnreadChatMessage;
 import com.poortorich.chat.entity.enums.ChatroomRole;
 import com.poortorich.chat.model.UnreadChatInfo;
 import com.poortorich.chat.realtime.model.PayloadContext;
@@ -24,13 +25,20 @@ public class UnreadChatMessageService {
 
     private final UnreadChatMessageRepository unreadChatMessageRepository;
 
-    @Transactional
-    public void saveUnreadMembers(Long chatroomId, Long chatMessageId, List<Long> userIds) {
-        if (userIds.isEmpty()) {
-            return;
-        }
+    public List<Long> saveUnreadMember(ChatMessage chatMessage, List<ChatParticipant> chatMembers) {
+        List<UnreadChatMessage> unreadChatMessages = chatMembers.stream()
+                .map(chatParticipant -> UnreadChatMessage.builder()
+                        .user(chatParticipant.getUser())
+                        .chatroom(chatParticipant.getChatroom())
+                        .chatMessage(chatMessage)
+                        .build())
+                .toList();
 
-        unreadChatMessageRepository.saveUnreadMembers(chatroomId, chatMessageId, userIds);
+        unreadChatMessageRepository.saveAll(unreadChatMessages);
+
+        return chatMembers.stream()
+                .map(chatParticipant -> chatParticipant.getUser().getId())
+                .toList();
     }
 
     public List<Long> getUserIdsByChatMessage(Long userId, ChatMessage chatMessage) {

@@ -7,6 +7,7 @@ import com.poortorich.chat.entity.enums.ChatroomRole;
 import com.poortorich.chat.model.MarkAllChatroomAsReadResult;
 import com.poortorich.chat.model.UnreadChatInfo;
 import com.poortorich.chat.realtime.collect.ChatPayloadCollector;
+import com.poortorich.chat.realtime.event.chatroom.ChatroomUpdateEvent;
 import com.poortorich.chat.realtime.event.user.HostDelegationEvent;
 import com.poortorich.chat.realtime.model.PayloadContext;
 import com.poortorich.chat.realtime.payload.request.ChatMessageRequestPayload;
@@ -18,6 +19,7 @@ import com.poortorich.chat.realtime.payload.response.MessageReadPayload;
 import com.poortorich.chat.realtime.payload.response.RankingStatusMessagePayload;
 import com.poortorich.chat.realtime.payload.response.UserChatMessagePayload;
 import com.poortorich.chat.realtime.payload.response.UserEnterResponsePayload;
+import com.poortorich.chat.realtime.payload.response.enums.PayloadType;
 import com.poortorich.chat.response.MarkAllChatroomAsReadResponse;
 import com.poortorich.chat.response.enums.ChatResponse;
 import com.poortorich.chat.service.ChatMessageService;
@@ -81,6 +83,7 @@ public class ChatRealTimeFacade {
                 .build();
     }
 
+    @Transactional
     public BasePayload createUserChatMessage(String username, ChatMessageRequestPayload chatMessagePayload) {
         PayloadContext context = payloadCollector.getPayloadContext(
                 username,
@@ -99,6 +102,14 @@ public class ChatRealTimeFacade {
 
         UserChatMessagePayload chatMessage = chatMessageService
                 .saveUserChatMessage(chatParticipant, chatMembers, chatMessagePayload);
+
+        eventPublisher.publishEvent(new ChatroomUpdateEvent(
+                chatroom,
+                PayloadType.CHATROOM_MESSAGE_UPDATED,
+                chatMessage.getMessageId(),
+                chatMessage.getContent(),
+                chatMessage.getSentAt()
+        ));
 
         return chatMessage.mapToBasePayload();
     }

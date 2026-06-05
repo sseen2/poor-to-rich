@@ -79,17 +79,4 @@ public interface UnreadChatMessageRepository extends JpaRepository<UnreadChatMes
     void deleteByChatroom(@Param("chatroom") Chatroom chatroom);
 
     Long countByUserAndChatroom(User user, Chatroom chatroom);
-
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(value = """
-            INSERT INTO unread_chat_message (user_id, chatroom_id, chat_message_id, created_date, updated_date)
-            SELECT cp.user_id, :chatroomId, :chatMessageId, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-            FROM chat_participant cp
-            WHERE cp.chatroom_id = :chatroomId
-            AND cp.user_id IN :userIds
-            """, nativeQuery = true)
-    void saveUnreadMembers(
-            @Param("chatroomId") Long chatroomId,
-            @Param("chatMessageId") Long chatMessageId,
-            @Param("userIds") List<Long> userIds);
 }
