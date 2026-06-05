@@ -12,6 +12,7 @@ import com.poortorich.chat.realtime.builder.RankingStatusChatMessageBuilder;
 import com.poortorich.chat.realtime.builder.SystemMessageBuilder;
 import com.poortorich.chat.realtime.builder.UserChatMessageBuilder;
 import com.poortorich.chat.realtime.event.datechange.detector.DateChangeDetector;
+import com.poortorich.chat.realtime.event.message.ChatMessageSavedEvent;
 import com.poortorich.chat.realtime.model.PayloadContext;
 import com.poortorich.chat.realtime.payload.request.ChatMessageRequestPayload;
 import com.poortorich.chat.realtime.payload.response.ChatroomClosedResponsePayload;
@@ -35,6 +36,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -48,7 +50,6 @@ import java.util.Optional;
 public class ChatMessageService {
 
     private final ChatMessageRepository chatMessageRepository;
-    private final UnreadChatMessageService unreadChatMessageService;
 
     private final RankerProfileMapper rankerProfileMapper;
     private final UserChatMessageBuilder userChatMessageBuilder;
@@ -111,7 +112,10 @@ public class ChatMessageService {
                 userChatMessageBuilder.buildChatMessage(chatParticipant, chatMessageRequestPayload));
         publishLastMessageUpdatedEvent(chatMessage);
 
-        List<Long> unreadBy = unreadChatMessageService.saveUnreadMember(chatMessage, chatMembers);
+        List<Long> unreadBy = chatMembers.stream()
+                .map(chatMember -> chatMember.getUser().getId())
+                .toList();
+        publishChatMessageSavedEvent(chatMessage, unreadBy);
 
         return UserChatMessagePayload.builder()
                 .messageId(chatMessage.getId())
@@ -397,6 +401,17 @@ public class ChatMessageService {
                 chatMessage.getChatroom().getId(),
                 chatMessage.getType(),
                 chatMessage.getSentAt()
+        ));
+    }
+
+    private void publishChatMessageSavedEvent(ChatMessage chatMessage, List<Long> unreadBy) {
+        eventPublisher.publishEvent(new ChatMessageSavedEvent(
+                chatMessage.getChatroom().getId(),
+                chatMessage.getId(),
+                chatMessage.getContent(),
+                chatMessage.getSentAt(),
+                Instant.now(),
+                unreadBy
         ));
     }
 }
