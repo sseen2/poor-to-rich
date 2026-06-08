@@ -362,10 +362,15 @@ public class ChatFacade {
         Slice<ChatMessage> chatMessages = chatMessageService.getChatMessages(context);
 
         Long nextCursor = paginationProvider.getNextCursor(chatMessages);
-        List<ChatMessageResponse> messages = chatMessages.getContent().stream()
+        List<ChatMessage> chatMessageContents = chatMessages.getContent();
+        Long userId = context.chatParticipant().getUser().getId();
+        Map<Long, List<Long>> unreadByMessageId = unreadChatMessageService.getUserIdsByChatMessages(
+                userId,
+                chatMessageContents);
+        List<ChatMessageResponse> messages = chatMessageContents.stream()
                 .map(message -> chatMessageMapper.mapToChatMessageResponse(
-                        context.chatParticipant().getUser().getId(),
-                        message))
+                        message,
+                        unreadByMessageId.getOrDefault(message.getId(), List.of())))
                 .collect(Collectors.toList());
         Collections.reverse(messages);
 

@@ -17,6 +17,8 @@ import com.poortorich.ranking.util.mapper.RankerProfileMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 @Component
 @RequiredArgsConstructor
 public class ChatMessageMapper {
@@ -27,13 +29,22 @@ public class ChatMessageMapper {
     private final RankerProfileMapper rankerProfileMapper;
 
     public ChatMessageResponse mapToChatMessageResponse(Long userId, ChatMessage chatMessage) {
+        List<Long> unreadBy = switch (chatMessage.getMessageType()) {
+            case TEXT, PHOTO -> unreadChatMessageService.getUserIdsByChatMessage(userId, chatMessage);
+            default -> List.of();
+        };
+
+        return mapToChatMessageResponse(chatMessage, unreadBy);
+    }
+
+    public ChatMessageResponse mapToChatMessageResponse(ChatMessage chatMessage, List<Long> unreadBy) {
         return switch (chatMessage.getMessageType()) {
             case RANKING -> rankingMessage(chatMessage);
             case RANKING_STATUS -> rankingStatusMessage(chatMessage);
             case ENTER -> userEnterMessage(chatMessage);
             case LEAVE, KICK -> userLeaveMessage(chatMessage);
             case CLOSE -> chatroomClosedMessage(chatMessage);
-            case TEXT, PHOTO -> userChatMessage(userId, chatMessage);
+            case TEXT, PHOTO -> userChatMessage(chatMessage, unreadBy);
             case DATE -> dateChangeMessage(chatMessage);
             case DELEGATE -> hostDelegationMessage(chatMessage);
         };
@@ -123,7 +134,7 @@ public class ChatMessageMapper {
                 .build();
     }
 
-    private ChatMessageResponse userChatMessage(Long userId, ChatMessage chatMessage) {
+    private ChatMessageResponse userChatMessage(ChatMessage chatMessage, List<Long> unreadBy) {
         return UserChatMessagePayload.builder()
                 .messageId(chatMessage.getId())
                 .chatroomId(chatMessage.getChatroom().getId())
@@ -132,7 +143,7 @@ public class ChatMessageMapper {
                 .messageType(chatMessage.getMessageType())
                 .content(chatMessage.getContent())
                 .sentAt(chatMessage.getSentAt())
-                .unreadBy(unreadChatMessageService.getUserIdsByChatMessage(userId, chatMessage))
+                .unreadBy(unreadBy)
                 .type(chatMessage.getType())
                 .build();
     }

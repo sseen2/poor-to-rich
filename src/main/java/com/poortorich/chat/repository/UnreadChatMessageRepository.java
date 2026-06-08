@@ -30,6 +30,19 @@ public interface UnreadChatMessageRepository extends JpaRepository<UnreadChatMes
             @Param("role") ChatroomRole role);
 
     @Query("""
+            SELECT u.chatMessage.id, u.user.id
+            FROM UnreadChatMessage u
+            JOIN ChatParticipant cp ON cp.user = u.user AND cp.chatroom = u.chatroom
+            WHERE u.chatMessage.id IN :chatMessageIds
+            AND u.user.id <> :userId
+            AND cp.role != :role
+            """)
+    List<Object[]> findUserIdsByChatMessageIdsExcludingChatroomRole(
+            @Param("userId") Long userId,
+            @Param("chatMessageIds") List<Long> chatMessageIds,
+            @Param("role") ChatroomRole role);
+
+    @Query("""
             SELECT MAX(u.chatMessage.id)
             FROM UnreadChatMessage u
             WHERE u.chatroom = :chatroom

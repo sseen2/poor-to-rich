@@ -12,6 +12,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -33,7 +34,14 @@ import java.util.Objects;
 @DynamicUpdate
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "chat_participant")
+@Table(
+        name = "chat_participant",
+        indexes = {
+                @Index(name = "idx_chat_participant_chatroom_user", columnList = "chatroom_id, user_id"),
+                @Index(name = "idx_chat_participant_user_participated", columnList = "user_id, is_participated"),
+                @Index(name = "idx_chat_participant_chatroom_participated_role", columnList = "chatroom_id, is_participated, role")
+        }
+)
 public class ChatParticipant {
 
     @Id

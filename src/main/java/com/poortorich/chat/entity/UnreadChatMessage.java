@@ -7,6 +7,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -27,7 +28,14 @@ import java.time.LocalDateTime;
 @DynamicUpdate
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "unread_chat_message")
+@Table(
+        name = "unread_chat_message",
+        indexes = {
+                @Index(name = "idx_unread_chatroom_user", columnList = "chatroom_id, user_id"),
+                @Index(name = "idx_unread_message_user", columnList = "chat_message_id, user_id"),
+                @Index(name = "idx_unread_chatroom_user_message", columnList = "chatroom_id, user_id, chat_message_id")
+        }
+)
 public class UnreadChatMessage {
 
     @Id

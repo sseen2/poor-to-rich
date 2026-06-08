@@ -49,6 +49,26 @@ public class UnreadChatMessageService {
                 .toList();
     }
 
+    public Map<Long, List<Long>> getUserIdsByChatMessages(Long userId, List<ChatMessage> chatMessages) {
+        if (chatMessages.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Long> chatMessageIds = chatMessages.stream()
+                .map(ChatMessage::getId)
+                .toList();
+
+        return unreadChatMessageRepository.findUserIdsByChatMessageIdsExcludingChatroomRole(
+                        userId,
+                        chatMessageIds,
+                        ChatroomRole.BANNED)
+                .stream()
+                .collect(Collectors.groupingBy(
+                        result -> (Long) result[0],
+                        Collectors.mapping(result -> (Long) result[1], Collectors.toList())
+                ));
+    }
+
     @Transactional
     public MessageReadPayload markMessageAsRead(ChatParticipant chatParticipant) {
         unreadChatMessageRepository.markMessagesAsRead(chatParticipant.getChatroom(), chatParticipant.getUser());
