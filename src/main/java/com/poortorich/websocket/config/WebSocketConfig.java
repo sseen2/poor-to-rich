@@ -30,14 +30,6 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         registry.setUserDestinationPrefix("/chat/user");
     }
 
-    @Override
-    public void configureClientOutboundChannel(ChannelRegistration registration) {
-        registration.taskExecutor()
-                .corePoolSize(2)
-                .maxPoolSize(4)
-                .queueCapacity(200);
-    }
-
     @Bean(destroyMethod = "shutdown")
     public TaskScheduler heartbeatScheduler() {
         ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();

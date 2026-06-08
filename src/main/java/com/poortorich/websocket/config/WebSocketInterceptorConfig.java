@@ -14,11 +14,6 @@ public class WebSocketInterceptorConfig implements WebSocketMessageBrokerConfigu
 
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
-        registration.taskExecutor()
-                .corePoolSize(2)
-                .maxPoolSize(4)
-                .queueCapacity(200);
-
         registration.interceptors(stompInterceptor);
     }
 }
