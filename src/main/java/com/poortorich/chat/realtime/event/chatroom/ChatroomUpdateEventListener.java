@@ -24,6 +24,8 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 @Component
 @Slf4j
@@ -37,6 +39,13 @@ public class ChatroomUpdateEventListener {
     private final ChatroomMapper chatroomMapper;
     private final TaskExecutor taskExecutor;
     private final Timer processDelayTimer;
+    private final Timer processDurationTimer;
+    private final Timer chatroomQueryTimer;
+    private final Timer participantsQueryTimer;
+    private final Timer memberCountQueryTimer;
+    private final Timer unreadCountQueryTimer;
+    private final Timer latestReadMessageQueryTimer;
+    private final Timer summaryMappingTimer;
 
     public ChatroomUpdateEventListener(
             BroadcastService broadcastService,
@@ -58,6 +67,27 @@ public class ChatroomUpdateEventListener {
         this.processDelayTimer = Timer.builder("chat.message.post.process.delay")
                 .description("Delay between chat message creation and post-processing start")
                 .register(meterRegistry);
+        this.processDurationTimer = Timer.builder("chat.message.post.process.duration")
+                .description("Time spent processing chat message post-processing task")
+                .register(meterRegistry);
+        this.chatroomQueryTimer = Timer.builder("chat.message.post.chatroom.query.duration")
+                .description("Time spent loading chatroom during chat message post-processing")
+                .register(meterRegistry);
+        this.participantsQueryTimer = Timer.builder("chat.message.post.participants.query.duration")
+                .description("Time spent loading chatroom participants during chat message post-processing")
+                .register(meterRegistry);
+        this.memberCountQueryTimer = Timer.builder("chat.message.post.member.count.query.duration")
+                .description("Time spent counting chatroom members during chat message post-processing")
+                .register(meterRegistry);
+        this.unreadCountQueryTimer = Timer.builder("chat.message.post.unread.count.query.duration")
+                .description("Time spent counting unread chat messages during chat message post-processing")
+                .register(meterRegistry);
+        this.latestReadMessageQueryTimer = Timer.builder("chat.message.post.latest.read.query.duration")
+                .description("Time spent loading latest read message ids during chat message post-processing")
+                .register(meterRegistry);
+        this.summaryMappingTimer = Timer.builder("chat.message.post.summary.mapping.duration")
+                .description("Time spent mapping my chatroom summary payloads during chat message post-processing")
+                .register(meterRegistry);
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -66,7 +96,7 @@ public class ChatroomUpdateEventListener {
     }
 
     private void broadcastChatroomUpdated(ChatroomUpdateEvent event) {
-        Chatroom chatroom = chatroomService.findById(event.getChatroomId());
+        Chatroom chatroom = record(chatroomQueryTimer, () -> chatroomService.findById(event.getChatroomId()));
 
         if (event.hasMessageUpdatePayload()) {
             recordProcessDelay(event.getSentAt());
@@ -83,12 +113,13 @@ public class ChatroomUpdateEventListener {
     }
 
     private void broadcastChatroomInfoUpdated(Chatroom chatroom, ChatroomUpdateEvent event) {
-        List<ChatParticipant> participants = chatParticipantService.findAllByChatroomWithUserAndChatroom(chatroom);
+        List<ChatParticipant> participants = record(participantsQueryTimer,
+                () -> chatParticipantService.findAllByChatroomWithUserAndChatroom(chatroom));
 
         participants.forEach(participant -> {
             BasePayload basePayload = BasePayload.builder()
                     .type(event.getPayloadType())
-                    .payload(chatroomMapper.mapToMyChatroom(participant))
+                    .payload(record(summaryMappingTimer, () -> chatroomMapper.mapToMyChatroom(participant)))
                     .build();
 
             broadcastService.broadcastInMyChatroom(participant.getUser().getId(), basePayload);
@@ -96,24 +127,25 @@ public class ChatroomUpdateEventListener {
     }
 
     private void broadcastChatroomMessageUpdated(Chatroom chatroom, ChatroomUpdateEvent event) {
-        List<ChatParticipant> participants = chatParticipantService.findAllByChatroomWithUserAndChatroom(
-                chatroom);
-        Long currentMemberCount = chatParticipantService.countByChatroom(chatroom);
-        Map<Long, Long> unreadMessageCountByUserId = unreadChatMessageService.countByUnreadChatMessages(
-                chatroom);
-        Map<Long, Long> latestReadMessageIdByParticipantId = chatMessageService.getLatestReadMessageIdsByParticipants(
-                participants);
+        List<ChatParticipant> participants = record(participantsQueryTimer,
+                () -> chatParticipantService.findAllByChatroomWithUserAndChatroom(chatroom));
+        Long currentMemberCount = record(memberCountQueryTimer,
+                () -> chatParticipantService.countByChatroom(chatroom));
+        Map<Long, Long> unreadMessageCountByUserId = record(unreadCountQueryTimer,
+                () -> unreadChatMessageService.countByUnreadChatMessages(chatroom));
+        Map<Long, Long> latestReadMessageIdByParticipantId = record(latestReadMessageQueryTimer,
+                () -> chatMessageService.getLatestReadMessageIdsByParticipants(participants));
 
         participants.forEach(participant -> {
             BasePayload basePayload = BasePayload.builder()
                     .type(event.getPayloadType())
-                    .payload(chatroomMapper.mapToMyChatroom(
+                    .payload(record(summaryMappingTimer, () -> chatroomMapper.mapToMyChatroom(
                             participant,
                             event.getContent(),
                             event.getSentAt(),
                             currentMemberCount,
                             latestReadMessageIdByParticipantId.get(participant.getId()),
-                            unreadMessageCountByUserId.getOrDefault(participant.getUser().getId(), 0L)))
+                            unreadMessageCountByUserId.getOrDefault(participant.getUser().getId(), 0L))))
                     .build();
 
             broadcastService.broadcastInMyChatroom(participant.getUser().getId(), basePayload);
@@ -141,13 +173,22 @@ public class ChatroomUpdateEventListener {
         try {
             taskExecutor.execute(() -> {
                 try {
-                    task.run();
+                    processDurationTimer.record(task);
                 } catch (RuntimeException exception) {
                     log.warn("[CHAT_MESSAGE_POST_PROCESS_FAILED] async chatroom update task failed", exception);
                 }
             });
         } catch (TaskRejectedException exception) {
             log.warn("[CHAT_MESSAGE_POST_PROCESS_REJECTED] async chatroom update task rejected", exception);
+        }
+    }
+
+    private <T> T record(Timer timer, Supplier<T> supplier) {
+        long startTime = System.nanoTime();
+        try {
+            return supplier.get();
+        } finally {
+            timer.record(System.nanoTime() - startTime, TimeUnit.NANOSECONDS);
         }
     }
 
