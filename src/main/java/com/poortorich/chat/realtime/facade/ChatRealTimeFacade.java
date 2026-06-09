@@ -37,10 +37,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -59,6 +61,7 @@ public class ChatRealTimeFacade {
     private final ChatParticipantValidator participantValidator;
 
     private final ApplicationEventPublisher eventPublisher;
+    private final TransactionTemplate transactionTemplate;
 
     public void createChatroom(String username, Long newChatroomId, Boolean isRankingEnabled) {
         createDateChangeSystemMessage(newChatroomId);
@@ -83,22 +86,35 @@ public class ChatRealTimeFacade {
                 .build();
     }
 
-    @Transactional
     public BasePayload createUserChatMessage(String username, ChatMessageRequestPayload chatMessagePayload) {
+        Set<String> activeSubscribers = chatParticipantService.getActiveSubscribers(
+                chatMessagePayload.getChatroomId());
+
+        return transactionTemplate.execute(status ->
+                createUserChatMessageInTransaction(username, chatMessagePayload, activeSubscribers));
+    }
+
+    private BasePayload createUserChatMessageInTransaction(
+            String username,
+            ChatMessageRequestPayload chatMessagePayload,
+            Set<String> activeSubscribers
+    ) {
         PayloadContext context = payloadCollector.getPayloadContext(
                 username,
                 chatMessagePayload.getChatroomId());
 
         User user = context.user();
         Chatroom chatroom = context.chatroom();
-
-        ChatParticipant chatParticipant = chatParticipantService.findByUserAndChatroom(user, chatroom);
+        ChatParticipant chatParticipant = context.chatParticipant();
 
         chatroomValidator.validateIsOpened(chatroom);
         participantValidator.validateIsParticipate(chatParticipant);
         participantValidator.validateIsBanned(chatParticipant);
 
-        List<ChatParticipant> chatMembers = chatParticipantService.findUnreadMembers(chatroom, user);
+        List<ChatParticipant> chatMembers = chatParticipantService.findUnreadMembers(
+                chatroom,
+                user,
+                activeSubscribers);
 
         UserChatMessagePayload chatMessage = chatMessageService
                 .saveUserChatMessage(chatParticipant, chatMembers, chatMessagePayload);
