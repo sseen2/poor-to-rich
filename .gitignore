@@ -41,3 +41,4 @@ out/
 mysqld-exporter.cnf
 sql/
 *.hprof
+/load-test
