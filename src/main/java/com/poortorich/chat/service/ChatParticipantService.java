@@ -144,10 +144,15 @@ public class ChatParticipantService {
         return chatParticipantRepository.findAllByUsernameWithChatroomAndUser(username);
     }
 
-    @Transactional
-    public List<ChatParticipant> findUnreadMembers(Chatroom chatroom, User user) {
-        Set<String> activeSubscribers = subscribeService.getSubscribers(chatroom.getId());
+    public Set<String> getActiveSubscribers(Long chatroomId) {
+        return subscribeService.getSubscribers(chatroomId);
+    }
 
+    public List<ChatParticipant> findUnreadMembers(
+            Chatroom chatroom,
+            User user,
+            Set<String> activeSubscribers
+    ) {
         return chatParticipantRepository.findAllByChatroomAndIsParticipatedTrueAndUserNot(chatroom, user).stream()
                 .filter(chatParticipant -> !activeSubscribers.contains(chatParticipant.getUser().getUsername()))
                 .filter(chatParticipant -> !ChatroomRole.BANNED.equals(chatParticipant.getRole()))
