@@ -12,17 +12,19 @@ public class ChatroomUpdateEvent {
     private final Long chatroomId;
     private final PayloadType payloadType;
     private final Long messageId;
+    private final Long senderId;
     private final String content;
     private final LocalDateTime sentAt;
 
     public ChatroomUpdateEvent(Chatroom chatroom, PayloadType payloadType) {
-        this(chatroom, payloadType, null, null, null);
+        this(chatroom, payloadType, null, null, null, null);
     }
 
     public ChatroomUpdateEvent(
             Chatroom chatroom,
             PayloadType payloadType,
             Long messageId,
+            Long senderId,
             String content,
             LocalDateTime sentAt
     ) {
@@ -30,6 +32,7 @@ public class ChatroomUpdateEvent {
         this.chatroomId = chatroom.getId();
         this.payloadType = payloadType;
         this.messageId = messageId;
+        this.senderId = senderId;
         this.content = content;
         this.sentAt = sentAt;
     }
@@ -37,6 +40,7 @@ public class ChatroomUpdateEvent {
     public boolean hasMessageUpdatePayload() {
         return PayloadType.CHATROOM_MESSAGE_UPDATED.equals(payloadType)
                 && messageId != null
+                && senderId != null
                 && sentAt != null;
     }
 }

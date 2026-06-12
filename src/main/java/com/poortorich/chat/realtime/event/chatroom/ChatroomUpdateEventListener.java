@@ -5,7 +5,6 @@ import com.poortorich.chat.entity.ChatParticipant;
 import com.poortorich.chat.entity.Chatroom;
 import com.poortorich.chat.realtime.payload.response.BasePayload;
 import com.poortorich.chat.realtime.payload.response.enums.PayloadType;
-import com.poortorich.chat.service.ChatMessageService;
 import com.poortorich.chat.service.ChatParticipantService;
 import com.poortorich.chat.service.UnreadChatMessageService;
 import com.poortorich.chat.util.mapper.ChatroomMapper;
@@ -23,6 +22,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
@@ -33,7 +33,6 @@ import java.util.function.Supplier;
 public class ChatroomUpdateEventListener {
 
     private final BroadcastService broadcastService;
-    private final ChatMessageService chatMessageService;
     private final ChatParticipantService chatParticipantService;
     private final UnreadChatMessageService unreadChatMessageService;
     private final ChatroomMapper chatroomMapper;
@@ -43,13 +42,11 @@ public class ChatroomUpdateEventListener {
     private final Timer participantsQueryTimer;
     private final Timer memberCountQueryTimer;
     private final Timer unreadCountQueryTimer;
-    private final Timer latestReadMessageQueryTimer;
     private final Timer summaryMappingTimer;
     private final ConcurrentMap<Long, Long> latestBroadcastMessageIds = new ConcurrentHashMap<>();
 
     public ChatroomUpdateEventListener(
             BroadcastService broadcastService,
-            ChatMessageService chatMessageService,
             ChatParticipantService chatParticipantService,
             UnreadChatMessageService unreadChatMessageService,
             ChatroomMapper chatroomMapper,
@@ -57,7 +54,6 @@ public class ChatroomUpdateEventListener {
             MeterRegistry meterRegistry
     ) {
         this.broadcastService = broadcastService;
-        this.chatMessageService = chatMessageService;
         this.chatParticipantService = chatParticipantService;
         this.unreadChatMessageService = unreadChatMessageService;
         this.chatroomMapper = chatroomMapper;
@@ -76,9 +72,6 @@ public class ChatroomUpdateEventListener {
                 .register(meterRegistry);
         this.unreadCountQueryTimer = Timer.builder("chat.message.post.unread.count.query.duration")
                 .description("Time spent counting unread chat messages during chat message post-processing")
-                .register(meterRegistry);
-        this.latestReadMessageQueryTimer = Timer.builder("chat.message.post.latest.read.query.duration")
-                .description("Time spent loading latest read message ids during chat message post-processing")
                 .register(meterRegistry);
         this.summaryMappingTimer = Timer.builder("chat.message.post.summary.mapping.duration")
                 .description("Time spent mapping my chatroom summary payloads during chat message post-processing")
@@ -128,8 +121,6 @@ public class ChatroomUpdateEventListener {
                 () -> chatParticipantService.countByChatroom(chatroom));
         Map<Long, Long> unreadMessageCountByUserId = record(unreadCountQueryTimer,
                 () -> unreadChatMessageService.countByUnreadChatMessages(chatroom));
-        Map<Long, Long> latestReadMessageIdByParticipantId = record(latestReadMessageQueryTimer,
-                () -> chatMessageService.getLatestReadMessageIdsByParticipants(participants));
 
         participants.forEach(participant -> {
             BasePayload basePayload = BasePayload.builder()
@@ -139,12 +130,22 @@ public class ChatroomUpdateEventListener {
                             event.getContent(),
                             event.getSentAt(),
                             currentMemberCount,
-                            latestReadMessageIdByParticipantId.get(participant.getId()),
+                            resolveLatestReadMessageId(participant, event),
                             unreadMessageCountByUserId.getOrDefault(participant.getUser().getId(), 0L))))
                     .build();
 
             broadcastService.broadcastInMyChatroom(participant.getUser().getId(), basePayload);
         });
+    }
+
+    private Long resolveLatestReadMessageId(ChatParticipant participant, ChatroomUpdateEvent event) {
+        if (Objects.equals(participant.getUser().getId(), event.getSenderId())) {
+            return event.getMessageId();
+        }
+        if (participant.getLatestReadMessageId() != null) {
+            return participant.getLatestReadMessageId();
+        }
+        return participant.getEnterMessageId();
     }
 
     private boolean shouldBroadcastMessageUpdate(ChatroomUpdateEvent event) {

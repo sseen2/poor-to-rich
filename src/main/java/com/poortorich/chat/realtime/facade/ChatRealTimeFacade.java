@@ -123,6 +123,7 @@ public class ChatRealTimeFacade {
                 chatroom,
                 PayloadType.CHATROOM_MESSAGE_UPDATED,
                 chatMessage.getMessageId(),
+                chatMessage.getSenderId(),
                 chatMessage.getContent(),
                 chatMessage.getSentAt()
         ));
