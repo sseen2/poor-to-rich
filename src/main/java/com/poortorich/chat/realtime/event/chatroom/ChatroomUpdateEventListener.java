@@ -7,7 +7,6 @@ import com.poortorich.chat.realtime.payload.response.BasePayload;
 import com.poortorich.chat.realtime.payload.response.enums.PayloadType;
 import com.poortorich.chat.service.ChatMessageService;
 import com.poortorich.chat.service.ChatParticipantService;
-import com.poortorich.chat.service.ChatroomService;
 import com.poortorich.chat.service.UnreadChatMessageService;
 import com.poortorich.chat.util.mapper.ChatroomMapper;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -24,6 +23,8 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
@@ -34,24 +35,22 @@ public class ChatroomUpdateEventListener {
     private final BroadcastService broadcastService;
     private final ChatMessageService chatMessageService;
     private final ChatParticipantService chatParticipantService;
-    private final ChatroomService chatroomService;
     private final UnreadChatMessageService unreadChatMessageService;
     private final ChatroomMapper chatroomMapper;
     private final TaskExecutor taskExecutor;
     private final Timer processDelayTimer;
     private final Timer processDurationTimer;
-    private final Timer chatroomQueryTimer;
     private final Timer participantsQueryTimer;
     private final Timer memberCountQueryTimer;
     private final Timer unreadCountQueryTimer;
     private final Timer latestReadMessageQueryTimer;
     private final Timer summaryMappingTimer;
+    private final ConcurrentMap<Long, Long> latestBroadcastMessageIds = new ConcurrentHashMap<>();
 
     public ChatroomUpdateEventListener(
             BroadcastService broadcastService,
             ChatMessageService chatMessageService,
             ChatParticipantService chatParticipantService,
-            ChatroomService chatroomService,
             UnreadChatMessageService unreadChatMessageService,
             ChatroomMapper chatroomMapper,
             @Qualifier("chatMessagePostTaskExecutor") TaskExecutor taskExecutor,
@@ -60,7 +59,6 @@ public class ChatroomUpdateEventListener {
         this.broadcastService = broadcastService;
         this.chatMessageService = chatMessageService;
         this.chatParticipantService = chatParticipantService;
-        this.chatroomService = chatroomService;
         this.unreadChatMessageService = unreadChatMessageService;
         this.chatroomMapper = chatroomMapper;
         this.taskExecutor = taskExecutor;
@@ -69,9 +67,6 @@ public class ChatroomUpdateEventListener {
                 .register(meterRegistry);
         this.processDurationTimer = Timer.builder("chat.message.post.process.duration")
                 .description("Time spent processing chat message post-processing task")
-                .register(meterRegistry);
-        this.chatroomQueryTimer = Timer.builder("chat.message.post.chatroom.query.duration")
-                .description("Time spent loading chatroom during chat message post-processing")
                 .register(meterRegistry);
         this.participantsQueryTimer = Timer.builder("chat.message.post.participants.query.duration")
                 .description("Time spent loading chatroom participants during chat message post-processing")
@@ -96,12 +91,12 @@ public class ChatroomUpdateEventListener {
     }
 
     private void broadcastChatroomUpdated(ChatroomUpdateEvent event) {
-        Chatroom chatroom = record(chatroomQueryTimer, () -> chatroomService.findById(event.getChatroomId()));
+        Chatroom chatroom = event.getChatroom();
 
         if (event.hasMessageUpdatePayload()) {
             recordProcessDelay(event.getSentAt());
 
-            if (!isLatestMessageEvent(chatroom, event.getMessageId())) {
+            if (!shouldBroadcastMessageUpdate(event)) {
                 return;
             }
 
@@ -152,9 +147,17 @@ public class ChatroomUpdateEventListener {
         });
     }
 
-    private boolean isLatestMessageEvent(Chatroom chatroom, Long eventMessageId) {
-        Long latestMessageId = chatMessageService.getLatestMessageId(chatroom);
-        return latestMessageId == null || latestMessageId <= eventMessageId;
+    private boolean shouldBroadcastMessageUpdate(ChatroomUpdateEvent event) {
+        Long previousMessageId = latestBroadcastMessageIds.compute(
+                event.getChatroomId(),
+                (chatroomId, currentMessageId) -> {
+                    if (currentMessageId == null || currentMessageId < event.getMessageId()) {
+                        return event.getMessageId();
+                    }
+                    return currentMessageId;
+                });
+
+        return event.getMessageId().equals(previousMessageId);
     }
 
     private void recordProcessDelay(LocalDateTime sentAt) {
