@@ -113,6 +113,14 @@ public class ChatParticipantService {
         return chatParticipantRepository.findAllByChatroomWithUserAndChatroom(chatroom);
     }
 
+    public List<ChatParticipant> findAllParticipatedByChatroomIdsWithUserAndChatroom(List<Long> chatroomIds) {
+        if (chatroomIds == null || chatroomIds.isEmpty()) {
+            return List.of();
+        }
+
+        return chatParticipantRepository.findAllParticipatedByChatroomIdsWithUserAndChatroom(chatroomIds);
+    }
+
     public boolean isAllParticipantLeft(Chatroom chatroom) {
         List<ChatParticipant> participants = chatParticipantRepository.findAllByChatroom(chatroom);
         return participants.stream()
@@ -221,6 +229,28 @@ public class ChatParticipantService {
                 RankingStatus.NONE,
                 List.of(RankingStatus.SAVER, RankingStatus.FLEXER)
         );
+    }
+
+    @Transactional
+    public void resetRankingStatusByChatroomIds(List<Long> chatroomIds) {
+        if (chatroomIds == null || chatroomIds.isEmpty()) {
+            return;
+        }
+
+        chatParticipantRepository.resetRankingStatusToNoneByChatroomIds(
+                chatroomIds,
+                RankingStatus.NONE,
+                List.of(RankingStatus.SAVER, RankingStatus.FLEXER)
+        );
+    }
+
+    @Transactional
+    public void updateRankingStatusByIds(List<Long> participantIds, RankingStatus rankingStatus) {
+        if (participantIds == null || participantIds.isEmpty()) {
+            return;
+        }
+
+        chatParticipantRepository.updateRankingStatusByIds(participantIds, rankingStatus);
     }
 
     public ChatParticipant findByChatroomAndRankingStatus(Chatroom chatroom, RankingStatus rankingStatus) {

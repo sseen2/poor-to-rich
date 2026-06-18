@@ -3,7 +3,7 @@ package com.poortorich.ranking.schedules;
 import com.poortorich.chat.entity.Chatroom;
 import com.poortorich.chat.service.ChatroomService;
 import com.poortorich.ranking.facade.RankingFacade;
-import com.poortorich.ranking.payload.response.RankingResponsePayload;
+import com.poortorich.ranking.model.BatchRankingResult;
 import com.poortorich.websocket.stomp.command.subscribe.endpoint.SubscribeEndpoint;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,7 +15,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -47,6 +46,7 @@ public class RankingScheduler {
     // 랭킹 집계 스케줄러
     @Scheduled(cron = "0 0 0 * * MON", zone = "Asia/Seoul")
     public void calculateAndBroadcastWeeklyRanking() {
+        long startedAt = System.currentTimeMillis();
         // 랭킹 기능을 활성화한 운영 중인 채팅방 목록 조회
         List<Chatroom> activeChatrooms = chatroomService.getChatroomsByRankingEnabledIsTrue();
 
@@ -59,29 +59,92 @@ public class RankingScheduler {
 //        processBatch(activeChatrooms);
 
 //         하나의 배치를 하나의 스레드에서 비동기로 처리
-        batches.forEach(batch -> {
-            CompletableFuture.runAsync(() -> {
-                try {
-                    processBatch(batch);
-                } catch (Exception exception) {
-                    log.error("랭킹 집계 실패");
-                }
-            }, taskExecutor);
-        });
+        List<CompletableFuture<RankingBatchSummary>> futures = batches.stream()
+                .map(batch -> CompletableFuture.supplyAsync(() -> processBatch(batch), taskExecutor)
+                        .exceptionally(exception -> {
+                            log.error("랭킹 집계 batch 실패 - chatroomCount: {}", batch.size(), exception);
+                            return RankingBatchSummary.failed(batch.size());
+                        }))
+                .toList();
+
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                .whenComplete((ignored, exception) -> logRankingSummary(
+                        activeChatrooms.size(),
+                        batches.size(),
+                        futures,
+                        startedAt
+                ));
     }
 
-    private void processBatch(List<Chatroom> chatrooms) {
-        chatrooms.forEach(chatroom -> {
-            // 랭킹 데이터 계산
-            RankingResponsePayload payload = rankingFacade.calculateRanking(chatroom);
+    private RankingBatchSummary processBatch(List<Chatroom> chatrooms) {
+        List<BatchRankingResult> rankingResults = rankingFacade.calculateRankings(chatrooms);
 
-            if (!Objects.isNull(payload)) {
-                // 채팅방에 랭킹 데이터를 담아 메세지 전송
-                messagingTemplate.convertAndSend(
-                        SubscribeEndpoint.CHATROOM_SUBSCRIBE_PREFIX + chatroom.getId(),
-                        payload.mapToBasePayload()
-                );
-            }
+        rankingResults.forEach(result -> {
+            // 채팅방에 랭킹 데이터를 담아 메세지 전송
+            messagingTemplate.convertAndSend(
+                    SubscribeEndpoint.CHATROOM_SUBSCRIBE_PREFIX + result.chatroom().getId(),
+                    result.payload().mapToBasePayload()
+            );
         });
+
+        return RankingBatchSummary.success(chatrooms.size(), rankingResults.size(), rankingResults.size());
+    }
+
+    private void logRankingSummary(
+            int totalChatroomCount,
+            int batchCount,
+            List<CompletableFuture<RankingBatchSummary>> futures,
+            long startedAt
+    ) {
+        List<RankingBatchSummary> summaries = futures.stream()
+                .map(CompletableFuture::join)
+                .toList();
+        int calculatedRankingCount = summaries.stream()
+                .mapToInt(RankingBatchSummary::calculatedRankingCount)
+                .sum();
+        int processedChatroomCount = summaries.stream()
+                .mapToInt(RankingBatchSummary::scannedChatroomCount)
+                .sum();
+        int broadcastMessageCount = summaries.stream()
+                .mapToInt(RankingBatchSummary::broadcastMessageCount)
+                .sum();
+        int failedBatchCount = summaries.stream()
+                .mapToInt(RankingBatchSummary::failedBatchCount)
+                .sum();
+        int failedChatroomCount = summaries.stream()
+                .mapToInt(RankingBatchSummary::failedChatroomCount)
+                .sum();
+
+        log.info(
+                "랭킹 집계 완료 - targetChatrooms: {}, processedChatrooms: {}, batches: {}, calculatedRankings: {}, broadcastMessages: {}, failedBatches: {}, failedChatrooms: {}, elapsedMs: {}",
+                totalChatroomCount,
+                processedChatroomCount,
+                batchCount,
+                calculatedRankingCount,
+                broadcastMessageCount,
+                failedBatchCount,
+                failedChatroomCount,
+                System.currentTimeMillis() - startedAt
+        );
+    }
+
+    private record RankingBatchSummary(
+            int scannedChatroomCount,
+            int calculatedRankingCount,
+            int broadcastMessageCount,
+            int failedBatchCount,
+            int failedChatroomCount
+    ) {
+        private static RankingBatchSummary success(
+                int scannedChatroomCount,
+                int calculatedRankingCount,
+                int broadcastMessageCount
+        ) {
+            return new RankingBatchSummary(scannedChatroomCount, calculatedRankingCount, broadcastMessageCount, 0, 0);
+        }
+
+        private static RankingBatchSummary failed(int failedChatroomCount) {
+            return new RankingBatchSummary(0, 0, 0, 1, failedChatroomCount);
+        }
     }
 }
