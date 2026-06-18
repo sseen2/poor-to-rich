@@ -3,11 +3,11 @@ package com.poortorich.chat.service;
 import com.poortorich.chat.entity.ChatMessage;
 import com.poortorich.chat.entity.ChatParticipant;
 import com.poortorich.chat.entity.Chatroom;
-import com.poortorich.chat.entity.UnreadChatMessage;
 import com.poortorich.chat.entity.enums.ChatroomRole;
 import com.poortorich.chat.model.UnreadChatInfo;
 import com.poortorich.chat.realtime.model.PayloadContext;
 import com.poortorich.chat.realtime.payload.response.MessageReadPayload;
+import com.poortorich.chat.repository.UnreadChatMessageBulkRepository;
 import com.poortorich.chat.repository.UnreadChatMessageRepository;
 import com.poortorich.user.entity.User;
 import lombok.RequiredArgsConstructor;
@@ -24,17 +24,14 @@ import java.util.stream.Collectors;
 public class UnreadChatMessageService {
 
     private final UnreadChatMessageRepository unreadChatMessageRepository;
+    private final UnreadChatMessageBulkRepository unreadChatMessageBulkRepository;
 
     public List<Long> saveUnreadMember(ChatMessage chatMessage, List<ChatParticipant> chatMembers) {
-        List<UnreadChatMessage> unreadChatMessages = chatMembers.stream()
-                .map(chatParticipant -> UnreadChatMessage.builder()
-                        .user(chatParticipant.getUser())
-                        .chatroom(chatParticipant.getChatroom())
-                        .chatMessage(chatMessage)
-                        .build())
-                .toList();
+        if (chatMembers.isEmpty()) {
+            return List.of();
+        }
 
-        unreadChatMessageRepository.saveAll(unreadChatMessages);
+        unreadChatMessageBulkRepository.saveAll(chatMessage, chatMembers);
 
         return chatMembers.stream()
                 .map(chatParticipant -> chatParticipant.getUser().getId())

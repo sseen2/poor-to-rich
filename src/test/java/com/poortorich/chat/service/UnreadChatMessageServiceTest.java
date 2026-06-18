@@ -1,8 +1,12 @@
 package com.poortorich.chat.service;
 
 import com.poortorich.chat.entity.ChatMessage;
+import com.poortorich.chat.entity.ChatParticipant;
+import com.poortorich.chat.entity.Chatroom;
 import com.poortorich.chat.entity.enums.ChatroomRole;
+import com.poortorich.chat.repository.UnreadChatMessageBulkRepository;
 import com.poortorich.chat.repository.UnreadChatMessageRepository;
+import com.poortorich.user.entity.User;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,6 +18,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -24,8 +30,42 @@ class UnreadChatMessageServiceTest {
     @Mock
     private UnreadChatMessageRepository unreadChatMessageRepository;
 
+    @Mock
+    private UnreadChatMessageBulkRepository unreadChatMessageBulkRepository;
+
     @InjectMocks
     private UnreadChatMessageService unreadChatMessageService;
+
+    @Test
+    @DisplayName("안 읽은 메시지 대상자를 bulk insert로 저장하고 사용자 ID 목록을 반환한다")
+    void saveUnreadMemberSuccess() {
+        ChatMessage chatMessage = ChatMessage.builder().id(10L).build();
+        Chatroom chatroom = Chatroom.builder().id(1L).build();
+        User firstUser = User.builder().id(2L).build();
+        User secondUser = User.builder().id(3L).build();
+        List<ChatParticipant> chatMembers = List.of(
+                ChatParticipant.builder().user(firstUser).chatroom(chatroom).build(),
+                ChatParticipant.builder().user(secondUser).chatroom(chatroom).build()
+        );
+
+        List<Long> result = unreadChatMessageService.saveUnreadMember(chatMessage, chatMembers);
+
+        assertThat(result).containsExactly(2L, 3L);
+        verify(unreadChatMessageBulkRepository).saveAll(chatMessage, chatMembers);
+        verify(unreadChatMessageRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    @DisplayName("안 읽은 메시지 대상자가 없으면 저장소를 호출하지 않는다")
+    void saveUnreadMemberEmpty() {
+        List<Long> result = unreadChatMessageService.saveUnreadMember(
+                ChatMessage.builder().id(10L).build(),
+                List.of());
+
+        assertThat(result).isEmpty();
+        verify(unreadChatMessageBulkRepository, never()).saveAll(any(), anyList());
+        verify(unreadChatMessageRepository, never()).saveAll(anyList());
+    }
 
     @Test
     @DisplayName("여러 채팅 메시지의 안 읽은 사용자 목록을 메시지별로 묶어 조회한다")
