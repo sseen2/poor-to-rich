@@ -76,6 +76,23 @@ public class RankingScheduler {
                 ));
     }
 
+    public void calculateAndBroadcastWeeklyRanking(Long chatroomId) {
+        long startedAt = System.currentTimeMillis();
+        Chatroom chatroom = chatroomService.findById(chatroomId);
+
+        RankingBatchSummary summary = processBatch(List.of(chatroom));
+
+        log.info(
+                "랭킹 단일 집계 완료 - chatroomId: {}, calculatedRankings: {}, broadcastMessages: {}, failedBatches: {}, failedChatrooms: {}, elapsedMs: {}",
+                chatroomId,
+                summary.calculatedRankingCount(),
+                summary.broadcastMessageCount(),
+                summary.failedBatchCount(),
+                summary.failedChatroomCount(),
+                System.currentTimeMillis() - startedAt
+        );
+    }
+
     private RankingBatchSummary processBatch(List<Chatroom> chatrooms) {
         List<BatchRankingResult> rankingResults = rankingFacade.calculateRankings(chatrooms);
 
