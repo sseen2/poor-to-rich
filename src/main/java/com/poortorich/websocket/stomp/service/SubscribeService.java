@@ -80,6 +80,15 @@ public class SubscribeService {
         }
     }
 
+    public boolean hasSubscribers(Long chatroomId) {
+        try {
+            Long subscriberCount = setOps.size(getChatroomKey(chatroomId));
+            return !Objects.isNull(subscriberCount) && subscriberCount > 0;
+        } catch (DataAccessException exception) {
+            throw new InternalServerErrorException(GlobalResponse.INTERNAL_SERVER_EXCEPTION);
+        }
+    }
+
     public void cleanupSession(String username, String sessionId) {
         try {
             String userSessionKey = getUsernameSessionKey(username, sessionId);
