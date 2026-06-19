@@ -47,6 +47,22 @@ public class UserProfileUpdatedEventListener {
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onRankingProfileUpdated(RankingProfileUpdateEvent event) {
+        var payload = UserUpdatedResponsePayload.builder()
+                .userId(event.getUserId())
+                .profileImage(event.getProfileImage())
+                .nickname(event.getNickname())
+                .isHost(event.getIsHost())
+                .rankingType(event.getRankingStatus())
+                .build();
+
+        messagingTemplate.convertAndSend(
+                SubscribeEndpoint.CHATROOM_SUBSCRIBE_PREFIX + event.getChatroomId(),
+                payload.mapToBasePayload()
+        );
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onHostDelegation(HostDelegationEvent event) {
         List<ChatParticipant> participants = List.of(event.getPrevHost(), event.getNewHost());
 

@@ -2,9 +2,10 @@ package com.poortorich.ranking.service;
 
 import com.poortorich.chat.entity.ChatMessage;
 import com.poortorich.chat.entity.ChatParticipant;
+import com.poortorich.chat.entity.enums.ChatroomRole;
 import com.poortorich.chat.entity.enums.ChatMessageType;
 import com.poortorich.chat.entity.enums.RankingStatus;
-import com.poortorich.chat.realtime.event.user.UserProfileUpdateEvent;
+import com.poortorich.chat.realtime.event.user.RankingProfileUpdateEvent;
 import com.poortorich.chat.response.ChatParticipantProfile;
 import com.poortorich.chat.service.ChatMessageService;
 import com.poortorich.chat.service.ChatParticipantService;
@@ -104,14 +105,30 @@ public class RankingBatchWriteService {
     private void publishFirstRankerProfileUpdateEvents(List<RankingCalculationResult> calculations) {
         calculations.stream()
                 .flatMap(calculation -> java.util.stream.Stream.of(
-                        getFirstRanker(calculation, RankingStatus.SAVER),
-                        getFirstRanker(calculation, RankingStatus.FLEXER)
+                        buildRankingProfileUpdateEvent(calculation, RankingStatus.SAVER),
+                        buildRankingProfileUpdateEvent(calculation, RankingStatus.FLEXER)
                 ))
                 .filter(Objects::nonNull)
-                .map(participant -> participant.getUser().getUsername())
-                .filter(Objects::nonNull)
-                .distinct()
-                .forEach(username -> eventPublisher.publishEvent(new UserProfileUpdateEvent(username)));
+                .forEach(eventPublisher::publishEvent);
+    }
+
+    private RankingProfileUpdateEvent buildRankingProfileUpdateEvent(
+            RankingCalculationResult calculation,
+            RankingStatus status
+    ) {
+        ChatParticipant participant = getFirstRanker(calculation, status);
+        if (Objects.isNull(participant) || Objects.isNull(participant.getUser())) {
+            return null;
+        }
+
+        return RankingProfileUpdateEvent.builder()
+                .chatroomId(calculation.chatroom().getId())
+                .userId(participant.getUser().getId())
+                .profileImage(participant.getUser().getProfileImage())
+                .nickname(participant.getUser().getNickname())
+                .isHost(ChatroomRole.HOST.equals(participant.getRole()))
+                .rankingStatus(status)
+                .build();
     }
 
     private ChatParticipant getFirstRanker(RankingCalculationResult calculation, RankingStatus status) {
