@@ -18,6 +18,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -131,12 +132,15 @@ public class RankingScheduler {
 
     private RankingBatchSummary processBatch(List<Chatroom> chatrooms) {
         List<BatchRankingResult> rankingResults = rankingFacade.calculateRankings(chatrooms);
+        Set<Long> subscribedChatroomIds = subscribeService.findSubscribedChatroomIds(rankingResults.stream()
+                .map(result -> result.chatroom().getId())
+                .toList());
 
         int broadcastMessageCount = 0;
         int skippedBroadcastMessageCount = 0;
         for (BatchRankingResult result : rankingResults) {
             Long chatroomId = result.chatroom().getId();
-            if (!subscribeService.hasSubscribers(chatroomId)) {
+            if (!subscribedChatroomIds.contains(chatroomId)) {
                 skippedBroadcastMessageCount++;
                 continue;
             }

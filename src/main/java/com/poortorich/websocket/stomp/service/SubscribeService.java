@@ -7,11 +7,16 @@ import com.poortorich.websocket.stomp.response.StompResponse;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataAccessException;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.SetOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
@@ -87,6 +92,36 @@ public class SubscribeService {
         } catch (DataAccessException exception) {
             throw new InternalServerErrorException(GlobalResponse.INTERNAL_SERVER_EXCEPTION);
         }
+    }
+
+    public Set<Long> findSubscribedChatroomIds(Collection<Long> chatroomIds) {
+        if (Objects.isNull(chatroomIds) || chatroomIds.isEmpty()) {
+            return Set.of();
+        }
+
+        List<Long> orderedChatroomIds = chatroomIds.stream().toList();
+        try {
+            List<Object> subscriberCounts = redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+                for (Long chatroomId : orderedChatroomIds) {
+                    connection.setCommands().sCard(getChatroomKey(chatroomId).getBytes(StandardCharsets.UTF_8));
+                }
+                return null;
+            });
+
+            Set<Long> subscribedChatroomIds = new HashSet<>();
+            for (int index = 0; index < orderedChatroomIds.size(); index++) {
+                if (hasSubscriberCount(subscriberCounts.get(index))) {
+                    subscribedChatroomIds.add(orderedChatroomIds.get(index));
+                }
+            }
+            return subscribedChatroomIds;
+        } catch (DataAccessException exception) {
+            throw new InternalServerErrorException(GlobalResponse.INTERNAL_SERVER_EXCEPTION);
+        }
+    }
+
+    private boolean hasSubscriberCount(Object subscriberCount) {
+        return subscriberCount instanceof Number count && count.longValue() > 0;
     }
 
     public void cleanupSession(String username, String sessionId) {
