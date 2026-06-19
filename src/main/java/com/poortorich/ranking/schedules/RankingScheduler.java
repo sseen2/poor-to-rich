@@ -7,6 +7,7 @@ import com.poortorich.ranking.facade.RankingFacade;
 import com.poortorich.ranking.model.BatchRankingResult;
 import com.poortorich.ranking.response.enums.RankingResponse;
 import com.poortorich.websocket.stomp.command.subscribe.endpoint.SubscribeEndpoint;
+import com.poortorich.websocket.stomp.service.SubscribeService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -29,6 +31,7 @@ public class RankingScheduler {
     private final RankingFacade rankingFacade;
     private final SimpMessagingTemplate messagingTemplate;
     private final ChatroomService chatroomService;
+    private final SubscribeService subscribeService;
     private final TaskExecutor taskExecutor;
     private final int batchSize;
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -37,12 +40,14 @@ public class RankingScheduler {
             RankingFacade rankingFacade,
             SimpMessagingTemplate messagingTemplate,
             ChatroomService chatroomService,
+            SubscribeService subscribeService,
             @Qualifier("rankingTaskExecutor") TaskExecutor taskExecutor,
             @Value("${ranking.scheduler.batch-size}") int batchSize
     ) {
         this.rankingFacade = rankingFacade;
         this.messagingTemplate = messagingTemplate;
         this.chatroomService = chatroomService;
+        this.subscribeService = subscribeService;
         this.taskExecutor = taskExecutor;
         this.batchSize = batchSize;
     }
@@ -103,10 +108,12 @@ public class RankingScheduler {
             RankingBatchSummary summary = processBatch(List.of(chatroom));
 
             log.info(
-                    "랭킹 단일 집계 완료 - chatroomId: {}, calculatedRankings: {}, broadcastMessages: {}, failedBatches: {}, failedChatrooms: {}, elapsedMs: {}",
+                    "랭킹 단일 집계 완료 - chatroomId: {}, calculatedRankings: {}, savedMessages: {}, broadcastMessages: {}, skippedBroadcastMessages: {}, failedBatches: {}, failedChatrooms: {}, elapsedMs: {}",
                     chatroomId,
                     summary.calculatedRankingCount(),
+                    summary.savedMessageCount(),
                     summary.broadcastMessageCount(),
+                    summary.skippedBroadcastMessageCount(),
                     summary.failedBatchCount(),
                     summary.failedChatroomCount(),
                     System.currentTimeMillis() - startedAt
@@ -125,16 +132,33 @@ public class RankingScheduler {
 
     private RankingBatchSummary processBatch(List<Chatroom> chatrooms) {
         List<BatchRankingResult> rankingResults = rankingFacade.calculateRankings(chatrooms);
+        Set<Long> subscribedChatroomIds = subscribeService.findSubscribedChatroomIds(rankingResults.stream()
+                .map(result -> result.chatroom().getId())
+                .toList());
 
-        rankingResults.forEach(result -> {
-            // 채팅방에 랭킹 데이터를 담아 메세지 전송
+        int broadcastMessageCount = 0;
+        int skippedBroadcastMessageCount = 0;
+        for (BatchRankingResult result : rankingResults) {
+            Long chatroomId = result.chatroom().getId();
+            if (!subscribedChatroomIds.contains(chatroomId)) {
+                skippedBroadcastMessageCount++;
+                continue;
+            }
+
             messagingTemplate.convertAndSend(
-                    SubscribeEndpoint.CHATROOM_SUBSCRIBE_PREFIX + result.chatroom().getId(),
+                    SubscribeEndpoint.CHATROOM_SUBSCRIBE_PREFIX + chatroomId,
                     result.payload().mapToBasePayload()
             );
-        });
+            broadcastMessageCount++;
+        }
 
-        return RankingBatchSummary.success(chatrooms.size(), rankingResults.size(), rankingResults.size());
+        return RankingBatchSummary.success(
+                chatrooms.size(),
+                rankingResults.size(),
+                rankingResults.size(),
+                broadcastMessageCount,
+                skippedBroadcastMessageCount
+        );
     }
 
     private void logRankingSummary(
@@ -152,8 +176,14 @@ public class RankingScheduler {
         int processedChatroomCount = summaries.stream()
                 .mapToInt(RankingBatchSummary::scannedChatroomCount)
                 .sum();
+        int savedMessageCount = summaries.stream()
+                .mapToInt(RankingBatchSummary::savedMessageCount)
+                .sum();
         int broadcastMessageCount = summaries.stream()
                 .mapToInt(RankingBatchSummary::broadcastMessageCount)
+                .sum();
+        int skippedBroadcastMessageCount = summaries.stream()
+                .mapToInt(RankingBatchSummary::skippedBroadcastMessageCount)
                 .sum();
         int failedBatchCount = summaries.stream()
                 .mapToInt(RankingBatchSummary::failedBatchCount)
@@ -163,12 +193,14 @@ public class RankingScheduler {
                 .sum();
 
         log.info(
-                "랭킹 집계 완료 - targetChatrooms: {}, processedChatrooms: {}, batches: {}, calculatedRankings: {}, broadcastMessages: {}, failedBatches: {}, failedChatrooms: {}, elapsedMs: {}",
+                "랭킹 집계 완료 - targetChatrooms: {}, processedChatrooms: {}, batches: {}, calculatedRankings: {}, savedMessages: {}, broadcastMessages: {}, skippedBroadcastMessages: {}, failedBatches: {}, failedChatrooms: {}, elapsedMs: {}",
                 totalChatroomCount,
                 processedChatroomCount,
                 batchCount,
                 calculatedRankingCount,
+                savedMessageCount,
                 broadcastMessageCount,
+                skippedBroadcastMessageCount,
                 failedBatchCount,
                 failedChatroomCount,
                 System.currentTimeMillis() - startedAt
@@ -178,20 +210,32 @@ public class RankingScheduler {
     private record RankingBatchSummary(
             int scannedChatroomCount,
             int calculatedRankingCount,
+            int savedMessageCount,
             int broadcastMessageCount,
+            int skippedBroadcastMessageCount,
             int failedBatchCount,
             int failedChatroomCount
     ) {
         private static RankingBatchSummary success(
                 int scannedChatroomCount,
                 int calculatedRankingCount,
-                int broadcastMessageCount
+                int savedMessageCount,
+                int broadcastMessageCount,
+                int skippedBroadcastMessageCount
         ) {
-            return new RankingBatchSummary(scannedChatroomCount, calculatedRankingCount, broadcastMessageCount, 0, 0);
+            return new RankingBatchSummary(
+                    scannedChatroomCount,
+                    calculatedRankingCount,
+                    savedMessageCount,
+                    broadcastMessageCount,
+                    skippedBroadcastMessageCount,
+                    0,
+                    0
+            );
         }
 
         private static RankingBatchSummary failed(int failedChatroomCount) {
-            return new RankingBatchSummary(0, 0, 0, 1, failedChatroomCount);
+            return new RankingBatchSummary(0, 0, 0, 0, 0, 1, failedChatroomCount);
         }
     }
 }
