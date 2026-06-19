@@ -28,7 +28,7 @@ ranking:
   task-executor:
     core-pool-size: 3
     max-pool-size: 3
-    queue-capacity: 100
+    queue-capacity: 200
 
 logging:
   level:

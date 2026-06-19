@@ -14,6 +14,10 @@ public enum RankingResponse implements Response {
     GET_LATEST_RANKING_NOT_FOUND(HttpStatus.OK, RankingResponseMessage.GET_LATEST_RANKING_NOT_FOUND, null),
     GET_ALL_RANKINGS_SUCCESS(HttpStatus.OK, RankingResponseMessage.GET_ALL_RANKINGS_SUCCESS, null),
     RANKING_TRIGGER_SUCCESS(HttpStatus.OK, RankingResponseMessage.RANKING_TRIGGER_SUCCESS, null),
+    RANKING_SCHEDULER_ALREADY_RUNNING(
+            HttpStatus.CONFLICT,
+            RankingResponseMessage.RANKING_SCHEDULER_ALREADY_RUNNING,
+            null),
     RANKING_TEST_DATA_CLEANUP_SUCCESS(HttpStatus.OK, RankingResponseMessage.RANKING_TEST_DATA_CLEANUP_SUCCESS, null);
 
     private final HttpStatus httpStatus;
