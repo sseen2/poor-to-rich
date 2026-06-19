@@ -232,10 +232,37 @@ public interface ChatParticipantRepository extends JpaRepository<ChatParticipant
     @Modifying(clearAutomatically = true)
     @Query("""
             UPDATE ChatParticipant cp
+            SET cp.rankingStatus = :none
+            WHERE cp.chatroom.id IN :chatroomIds
+            AND cp.id NOT IN :excludedParticipantIds
+            AND cp.rankingStatus IN :statuses
+            """)
+    void resetRankingStatusToNoneByChatroomIdsExcludingParticipantIds(
+            @Param("chatroomIds") List<Long> chatroomIds,
+            @Param("excludedParticipantIds") List<Long> excludedParticipantIds,
+            @Param("none") RankingStatus none,
+            @Param("statuses") List<RankingStatus> statuses
+    );
+
+    @Modifying(clearAutomatically = true)
+    @Query("""
+            UPDATE ChatParticipant cp
             SET cp.rankingStatus = :rankingStatus
             WHERE cp.id IN :participantIds
             """)
     void updateRankingStatusByIds(
+            @Param("participantIds") List<Long> participantIds,
+            @Param("rankingStatus") RankingStatus rankingStatus
+    );
+
+    @Modifying(clearAutomatically = true)
+    @Query("""
+            UPDATE ChatParticipant cp
+            SET cp.rankingStatus = :rankingStatus
+            WHERE cp.id IN :participantIds
+            AND cp.rankingStatus <> :rankingStatus
+            """)
+    void updateRankingStatusByIdsWhereStatusNot(
             @Param("participantIds") List<Long> participantIds,
             @Param("rankingStatus") RankingStatus rankingStatus
     );

@@ -38,7 +38,8 @@ public class RankingBatchWriteService {
 
     @Transactional
     public List<BatchRankingResult> save(List<Long> chatroomIds, List<RankingCalculationResult> calculations) {
-        chatParticipantService.resetRankingStatusByChatroomIds(chatroomIds);
+        List<Long> firstRankerIds = getFirstRankerIds(calculations);
+        chatParticipantService.resetRankingStatusByChatroomIdsExcludingParticipantIds(chatroomIds, firstRankerIds);
 
         if (calculations == null || calculations.isEmpty()) {
             return List.of();
@@ -75,11 +76,29 @@ public class RankingBatchWriteService {
         List<Long> participantIds = calculations.stream()
                 .map(calculation -> getFirstRanker(calculation, status))
                 .filter(Objects::nonNull)
+                .filter(participant -> !status.equals(participant.getRankingStatus()))
                 .map(ChatParticipant::getId)
                 .filter(Objects::nonNull)
                 .toList();
 
-        chatParticipantService.updateRankingStatusByIds(participantIds, status);
+        chatParticipantService.updateRankingStatusByIdsWhereStatusNot(participantIds, status);
+    }
+
+    private List<Long> getFirstRankerIds(List<RankingCalculationResult> calculations) {
+        if (calculations == null || calculations.isEmpty()) {
+            return List.of();
+        }
+
+        return calculations.stream()
+                .flatMap(calculation -> java.util.stream.Stream.of(
+                        getFirstRanker(calculation, RankingStatus.SAVER),
+                        getFirstRanker(calculation, RankingStatus.FLEXER)
+                ))
+                .filter(Objects::nonNull)
+                .map(ChatParticipant::getId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
     }
 
     private void publishFirstRankerProfileUpdateEvents(List<RankingCalculationResult> calculations) {

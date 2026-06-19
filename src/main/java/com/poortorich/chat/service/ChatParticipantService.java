@@ -245,12 +245,43 @@ public class ChatParticipantService {
     }
 
     @Transactional
+    public void resetRankingStatusByChatroomIdsExcludingParticipantIds(
+            List<Long> chatroomIds,
+            List<Long> excludedParticipantIds
+    ) {
+        if (chatroomIds == null || chatroomIds.isEmpty()) {
+            return;
+        }
+
+        if (excludedParticipantIds == null || excludedParticipantIds.isEmpty()) {
+            resetRankingStatusByChatroomIds(chatroomIds);
+            return;
+        }
+
+        chatParticipantRepository.resetRankingStatusToNoneByChatroomIdsExcludingParticipantIds(
+                chatroomIds,
+                excludedParticipantIds,
+                RankingStatus.NONE,
+                List.of(RankingStatus.SAVER, RankingStatus.FLEXER)
+        );
+    }
+
+    @Transactional
     public void updateRankingStatusByIds(List<Long> participantIds, RankingStatus rankingStatus) {
         if (participantIds == null || participantIds.isEmpty()) {
             return;
         }
 
         chatParticipantRepository.updateRankingStatusByIds(participantIds, rankingStatus);
+    }
+
+    @Transactional
+    public void updateRankingStatusByIdsWhereStatusNot(List<Long> participantIds, RankingStatus rankingStatus) {
+        if (participantIds == null || participantIds.isEmpty()) {
+            return;
+        }
+
+        chatParticipantRepository.updateRankingStatusByIdsWhereStatusNot(participantIds, rankingStatus);
     }
 
     public ChatParticipant findByChatroomAndRankingStatus(Chatroom chatroom, RankingStatus rankingStatus) {
