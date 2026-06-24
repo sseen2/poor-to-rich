@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Repository
@@ -19,10 +20,6 @@ public class UnreadChatMessageBulkRepository {
     private final JdbcTemplate jdbcTemplate;
 
     public void saveAll(ChatMessage chatMessage, List<ChatParticipant> chatMembers) {
-        if (chatMembers.isEmpty()) {
-            return;
-        }
-
         for (int start = 0; start < chatMembers.size(); start += BULK_INSERT_CHUNK_SIZE) {
             int end = Math.min(start + BULK_INSERT_CHUNK_SIZE, chatMembers.size());
             bulkInsert(chatMessage, chatMembers.subList(start, end));
@@ -30,21 +27,16 @@ public class UnreadChatMessageBulkRepository {
     }
 
     private void bulkInsert(ChatMessage chatMessage, List<ChatParticipant> chatMembers) {
-        StringBuilder sql = new StringBuilder("""
+        String sql = """
                 INSERT INTO unread_chat_message
                 (created_date, updated_date, chat_message_id, chatroom_id, user_id)
-                VALUES
-                """);
+                VALUES %s
+                """.formatted(String.join(", ", Collections.nCopies(
+                chatMembers.size(), "(?, ?, ?, ?, ?)")));
         List<Object> params = new ArrayList<>(chatMembers.size() * 5);
         LocalDateTime now = LocalDateTime.now();
 
-        for (int i = 0; i < chatMembers.size(); i++) {
-            if (i > 0) {
-                sql.append(", ");
-            }
-            sql.append("(?, ?, ?, ?, ?)");
-
-            ChatParticipant chatMember = chatMembers.get(i);
+        for (ChatParticipant chatMember : chatMembers) {
             params.add(now);
             params.add(now);
             params.add(chatMessage.getId());
@@ -52,6 +44,6 @@ public class UnreadChatMessageBulkRepository {
             params.add(chatMember.getUser().getId());
         }
 
-        jdbcTemplate.update(sql.toString(), params.toArray());
+        jdbcTemplate.update(sql, params.toArray());
     }
 }
