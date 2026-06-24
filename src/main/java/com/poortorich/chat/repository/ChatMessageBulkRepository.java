@@ -18,7 +18,7 @@ import java.util.stream.LongStream;
 @RequiredArgsConstructor
 public class ChatMessageBulkRepository {
 
-    private static final int BULK_INSERT_CHUNK_SIZE = 100;
+    private static final int BULK_INSERT_CHUNK_SIZE = 50;
 
     private final JdbcTemplate jdbcTemplate;
     private final ChatMessageRepository chatMessageRepository;
