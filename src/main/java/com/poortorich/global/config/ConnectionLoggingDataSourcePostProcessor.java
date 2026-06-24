@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j
 @Component
-@Profile("connection-log")
+@Profile({"connection-log", "loadtest"})
 public class ConnectionLoggingDataSourcePostProcessor implements BeanPostProcessor {
 
     @Override
