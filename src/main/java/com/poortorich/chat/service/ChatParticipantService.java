@@ -15,7 +15,6 @@ import com.poortorich.chatnotice.request.ChatNoticeStatusUpdateRequest;
 import com.poortorich.global.exceptions.BadRequestException;
 import com.poortorich.global.exceptions.NotFoundException;
 import com.poortorich.user.entity.User;
-import com.poortorich.websocket.stomp.service.SubscribeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.domain.SliceImpl;
@@ -25,7 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -33,7 +31,6 @@ import java.util.stream.Collectors;
 public class ChatParticipantService {
 
     private final ChatParticipantRepository chatParticipantRepository;
-    private final SubscribeService subscribeService;
 
     private final ChatBuilder chatBuilder;
     private final ParticipantProfileMapper profileMapper;
@@ -144,17 +141,8 @@ public class ChatParticipantService {
         return chatParticipantRepository.findAllByUsernameWithChatroomAndUser(username);
     }
 
-    public Set<String> getActiveSubscribers(Long chatroomId) {
-        return subscribeService.getSubscribers(chatroomId);
-    }
-
-    public List<ChatParticipant> findUnreadMembers(
-            Chatroom chatroom,
-            User user,
-            Set<String> activeSubscribers
-    ) {
+    public List<ChatParticipant> findUnreadMembers(Chatroom chatroom, User user) {
         return chatParticipantRepository.findAllByChatroomAndIsParticipatedTrueAndUserNot(chatroom, user).stream()
-                .filter(chatParticipant -> !activeSubscribers.contains(chatParticipant.getUser().getUsername()))
                 .filter(chatParticipant -> !ChatroomRole.BANNED.equals(chatParticipant.getRole()))
                 .toList();
     }

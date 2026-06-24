@@ -50,6 +50,7 @@ public class ChatResponseMessage {
     public static final String GET_CHAT_MESSAGE_SUCCESS = "이전 채팅 조회가 완료됐습니다.";
 
     public static final String CHATROOM_ID_REQUIRED = "채팅방 아이디는 필수값입니다.";
+    public static final String LAST_READ_MESSAGE_ID_REQUIRED = "마지막으로 읽은 메시지 아이디는 필수값입니다.";
     public static final String MESSAGE_TYPE_REQUIRED = "메시지 타입은 필수값입니다.";
     public static final String MARK_ALL_CHATROOM_AS_READ_SUCCESS = "참여중인 채팅방의 메세지를 모두 읽었습니다.";
     public static final String TARGET_USER_ID_IS_NULL = "방장을 위임할 회원 아이디는 필수 값입니다.";

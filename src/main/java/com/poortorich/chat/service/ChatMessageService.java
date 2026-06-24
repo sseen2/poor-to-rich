@@ -381,12 +381,6 @@ public class ChatMessageService {
         return latestReadMessageIdByParticipant;
     }
 
-    @Transactional
-    public void updateLatestMessageId(ChatParticipant chatParticipant) {
-        Long latestMessageId = chatMessageRepository.findLatestMessageIdByChatroom(chatParticipant.getChatroom());
-        chatParticipant.updateLatestReadMessageId(latestMessageId);
-    }
-
     public LocalDateTime getLatestMessageTimeByUser(User user) {
         Optional<LocalDateTime> latestTime = chatMessageRepository.findLatestMessageTimeByUser(user);
         return latestTime.orElse(null);

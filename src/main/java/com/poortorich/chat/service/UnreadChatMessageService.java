@@ -3,12 +3,16 @@ package com.poortorich.chat.service;
 import com.poortorich.chat.entity.ChatMessage;
 import com.poortorich.chat.entity.ChatParticipant;
 import com.poortorich.chat.entity.Chatroom;
-import com.poortorich.chat.entity.UnreadChatMessage;
 import com.poortorich.chat.entity.enums.ChatroomRole;
 import com.poortorich.chat.model.UnreadChatInfo;
 import com.poortorich.chat.realtime.model.PayloadContext;
 import com.poortorich.chat.realtime.payload.response.MessageReadPayload;
+import com.poortorich.chat.repository.ChatMessageRepository;
+import com.poortorich.chat.repository.ChatParticipantRepository;
+import com.poortorich.chat.repository.UnreadChatMessageBulkRepository;
 import com.poortorich.chat.repository.UnreadChatMessageRepository;
+import com.poortorich.chat.response.enums.ChatResponse;
+import com.poortorich.global.exceptions.NotFoundException;
 import com.poortorich.user.entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,17 +28,16 @@ import java.util.stream.Collectors;
 public class UnreadChatMessageService {
 
     private final UnreadChatMessageRepository unreadChatMessageRepository;
+    private final UnreadChatMessageBulkRepository unreadChatMessageBulkRepository;
+    private final ChatMessageRepository chatMessageRepository;
+    private final ChatParticipantRepository chatParticipantRepository;
 
     public List<Long> saveUnreadMember(ChatMessage chatMessage, List<ChatParticipant> chatMembers) {
-        List<UnreadChatMessage> unreadChatMessages = chatMembers.stream()
-                .map(chatParticipant -> UnreadChatMessage.builder()
-                        .user(chatParticipant.getUser())
-                        .chatroom(chatParticipant.getChatroom())
-                        .chatMessage(chatMessage)
-                        .build())
-                .toList();
+        if (chatMembers.isEmpty()) {
+            return List.of();
+        }
 
-        unreadChatMessageRepository.saveAll(unreadChatMessages);
+        unreadChatMessageBulkRepository.saveAll(chatMessage, chatMembers);
 
         return chatMembers.stream()
                 .map(chatParticipant -> chatParticipant.getUser().getId())
@@ -71,10 +74,30 @@ public class UnreadChatMessageService {
 
     @Transactional
     public MessageReadPayload markMessageAsRead(ChatParticipant chatParticipant) {
-        unreadChatMessageRepository.markMessagesAsRead(chatParticipant.getChatroom(), chatParticipant.getUser());
+        unreadChatMessageRepository.markAllMessagesAsRead(chatParticipant.getChatroom(), chatParticipant.getUser());
 
         return MessageReadPayload.builder()
                 .chatroomId(chatParticipant.getChatroom().getId())
+                .userId(chatParticipant.getUser().getId())
+                .readAt(LocalDateTime.now())
+                .build();
+    }
+
+    @Transactional
+    public MessageReadPayload markMessageAsRead(ChatParticipant chatParticipant, Long lastReadMessageId) {
+        if (!chatMessageRepository.existsByIdAndChatroom(lastReadMessageId, chatParticipant.getChatroom())) {
+            throw new NotFoundException(ChatResponse.CHAT_MESSAGE_NOT_FOUND);
+        }
+
+        chatParticipantRepository.advanceLatestReadMessageId(chatParticipant, lastReadMessageId);
+        unreadChatMessageRepository.markMessagesAsRead(
+                chatParticipant.getChatroom(),
+                chatParticipant.getUser(),
+                lastReadMessageId);
+
+        return MessageReadPayload.builder()
+                .chatroomId(chatParticipant.getChatroom().getId())
+                .lastReadMessageId(chatParticipantRepository.findLatestReadMessageId(chatParticipant))
                 .userId(chatParticipant.getUser().getId())
                 .readAt(LocalDateTime.now())
                 .build();

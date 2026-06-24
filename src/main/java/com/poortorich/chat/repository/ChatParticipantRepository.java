@@ -155,6 +155,20 @@ public interface ChatParticipantRepository extends JpaRepository<ChatParticipant
             @Param("userId") Long userId,
             @Param("chatroomId") Long chatroomId);
 
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            UPDATE ChatParticipant cp
+            SET cp.latestReadMessageId = :lastReadMessageId
+            WHERE cp = :participant
+            AND (cp.latestReadMessageId IS NULL OR cp.latestReadMessageId < :lastReadMessageId)
+            """)
+    void advanceLatestReadMessageId(
+            @Param("participant") ChatParticipant participant,
+            @Param("lastReadMessageId") Long lastReadMessageId);
+
+    @Query("SELECT cp.latestReadMessageId FROM ChatParticipant cp WHERE cp = :participant")
+    Long findLatestReadMessageId(@Param("participant") ChatParticipant participant);
+
     @Query("""
                 SELECT cp
                   FROM ChatParticipant cp

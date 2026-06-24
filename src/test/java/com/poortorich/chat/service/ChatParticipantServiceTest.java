@@ -138,6 +138,32 @@ class ChatParticipantServiceTest {
     }
 
     @Test
+    @DisplayName("발신자와 차단 참여자를 제외한 모든 참여자를 미읽음 대상으로 조회한다")
+    void findUnreadMembersExcludesBannedParticipants() {
+        User sender = User.builder().id(1L).build();
+        User memberUser = User.builder().id(2L).build();
+        User bannedUser = User.builder().id(3L).build();
+        Chatroom chatroom = Chatroom.builder().id(1L).build();
+        ChatParticipant member = ChatParticipant.builder()
+                .user(memberUser)
+                .chatroom(chatroom)
+                .role(ChatroomRole.MEMBER)
+                .build();
+        ChatParticipant banned = ChatParticipant.builder()
+                .user(bannedUser)
+                .chatroom(chatroom)
+                .role(ChatroomRole.BANNED)
+                .build();
+
+        when(chatParticipantRepository.findAllByChatroomAndIsParticipatedTrueAndUserNot(chatroom, sender))
+                .thenReturn(List.of(member, banned));
+
+        List<ChatParticipant> result = chatParticipantService.findUnreadMembers(chatroom, sender);
+
+        assertThat(result).containsExactly(member);
+    }
+
+    @Test
     @DisplayName("공지 상태 변경 성공")
     void updateNoticeStatusSuccess() {
         String username = "test";
