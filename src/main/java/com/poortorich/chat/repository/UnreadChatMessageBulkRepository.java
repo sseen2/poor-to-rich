@@ -15,7 +15,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class UnreadChatMessageBulkRepository {
 
-    private static final int BULK_INSERT_CHUNK_SIZE = 50;
+    private static final int BULK_INSERT_CHUNK_SIZE = 100;
 
     private final JdbcTemplate jdbcTemplate;
 

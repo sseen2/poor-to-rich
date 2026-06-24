@@ -17,6 +17,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -98,18 +99,22 @@ public class RankingScheduler {
         }
     }
 
-    public void calculateAndBroadcastWeeklyRanking(Long chatroomId) {
+    public void calculateAndBroadcastWeeklyRankingBatch() {
         startRankingExecution();
 
         long startedAt = System.currentTimeMillis();
         try {
-            Chatroom chatroom = chatroomService.findById(chatroomId);
+            List<Chatroom> batch = chatroomService.getChatroomsByRankingEnabledIsTrue().stream()
+                    .sorted(Comparator.comparing(Chatroom::getId))
+                    .limit(batchSize)
+                    .toList();
 
-            RankingBatchSummary summary = processBatch(List.of(chatroom));
+            RankingBatchSummary summary = processBatch(batch);
 
             log.info(
-                    "랭킹 단일 집계 완료 - chatroomId: {}, calculatedRankings: {}, savedMessages: {}, broadcastMessages: {}, skippedBroadcastMessages: {}, failedBatches: {}, failedChatrooms: {}, elapsedMs: {}",
-                    chatroomId,
+                    "랭킹 단일 batch 집계 완료 - batchSize: {}, processedChatrooms: {}, calculatedRankings: {}, savedMessages: {}, broadcastMessages: {}, skippedBroadcastMessages: {}, failedBatches: {}, failedChatrooms: {}, elapsedMs: {}",
+                    batchSize,
+                    summary.scannedChatroomCount(),
                     summary.calculatedRankingCount(),
                     summary.savedMessageCount(),
                     summary.broadcastMessageCount(),

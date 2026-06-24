@@ -7,7 +7,6 @@ import com.poortorich.ranking.schedules.RankingScheduler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -31,9 +30,9 @@ public class RankingTestController {
         return BaseResponse.toResponseEntity(RankingResponse.RANKING_TRIGGER_SUCCESS);
     }
 
-    @PostMapping("/trigger/{chatroomId}")
-    public ResponseEntity<BaseResponse> triggerRanking(@PathVariable Long chatroomId) {
-        rankingScheduler.calculateAndBroadcastWeeklyRanking(chatroomId);
+    @PostMapping("/trigger/batch")
+    public ResponseEntity<BaseResponse> triggerRankingBatch() {
+        rankingScheduler.calculateAndBroadcastWeeklyRankingBatch();
         return BaseResponse.toResponseEntity(RankingResponse.RANKING_TRIGGER_SUCCESS);
     }
 

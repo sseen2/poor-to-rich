@@ -2,6 +2,7 @@ package com.poortorich.ranking.repository;
 
 import com.poortorich.ranking.entity.Ranking;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -13,9 +14,10 @@ import java.util.stream.LongStream;
 
 @Repository
 @RequiredArgsConstructor
+@Slf4j
 public class RankingBulkRepository {
 
-    private static final int BULK_INSERT_CHUNK_SIZE = 50;
+    private static final int BULK_INSERT_CHUNK_SIZE = 100;
 
     private final JdbcTemplate jdbcTemplate;
     private final RankingRepository rankingRepository;
@@ -53,7 +55,13 @@ public class RankingBulkRepository {
             params.add(ranking.getChatroom().getId());
         }
 
+        long startedAt = System.nanoTime();
         jdbcTemplate.update(sql, params.toArray());
+        log.info(
+                "[RANKING_BULK_INSERT] rows={}, elapsedMs={}",
+                rankings.size(),
+                (System.nanoTime() - startedAt) / 1_000_000.0
+        );
 
         Long firstInsertedId = jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
         if (firstInsertedId == null) {
