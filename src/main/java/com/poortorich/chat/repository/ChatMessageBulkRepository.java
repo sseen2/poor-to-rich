@@ -20,7 +20,7 @@ import java.util.stream.LongStream;
 @Slf4j
 public class ChatMessageBulkRepository {
 
-    private static final int BULK_INSERT_CHUNK_SIZE = 50;
+    private static final int BULK_INSERT_CHUNK_SIZE = 100;
 
     private final JdbcTemplate jdbcTemplate;
     private final ChatMessageRepository chatMessageRepository;
