@@ -4,7 +4,6 @@ import com.poortorich.accountbook.model.domain.DailyAmount;
 import com.poortorich.accountbook.model.domain.PeriodAmount;
 import com.poortorich.category.entity.Category;
 import com.poortorich.expense.entity.Expense;
-import com.poortorich.ranking.model.ChatroomUserExpenseAggregate;
 import com.poortorich.ranking.model.UserExpenseAggregate;
 import com.poortorich.user.entity.User;
 import org.springframework.data.domain.Pageable;
@@ -172,27 +171,6 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
             """)
     List<UserExpenseAggregate> findExpenseAggregatesByUsersAndDateRange(
             @Param("users") List<User> users,
-            @Param("startDate") LocalDate startDate,
-            @Param("endDate") LocalDate endDate
-    );
-
-    @Query("""
-            SELECT NEW com.poortorich.ranking.model.ChatroomUserExpenseAggregate(
-                cp.chatroom.id,
-                e.user.id,
-                COALESCE(SUM(e.cost), 0L),
-                COUNT(DISTINCT e.expenseDate)
-            )
-            FROM ChatParticipant cp
-            JOIN Expense e
-              ON e.user = cp.user
-            WHERE cp.chatroom.id IN :chatroomIds
-              AND cp.isParticipated = true
-              AND e.expenseDate BETWEEN :startDate AND :endDate
-            GROUP BY cp.chatroom.id, e.user.id
-            """)
-    List<ChatroomUserExpenseAggregate> findExpenseAggregatesByChatroomsAndDateRange(
-            @Param("chatroomIds") List<Long> chatroomIds,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
     );
