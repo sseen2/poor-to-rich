@@ -4,7 +4,7 @@ import com.poortorich.chat.entity.Chatroom;
 import com.poortorich.global.exceptions.ConflictException;
 import com.poortorich.chat.service.ChatroomService;
 import com.poortorich.ranking.facade.RankingFacade;
-import com.poortorich.ranking.payload.response.RankingResponsePayload;
+import com.poortorich.ranking.model.BatchRankingResult;
 import com.poortorich.ranking.response.enums.RankingResponse;
 import com.poortorich.websocket.stomp.command.subscribe.endpoint.SubscribeEndpoint;
 import com.poortorich.websocket.stomp.service.SubscribeService;
@@ -136,21 +136,15 @@ public class RankingScheduler {
     }
 
     private RankingBatchSummary processBatch(List<Chatroom> chatrooms) {
-        Set<Long> subscribedChatroomIds = subscribeService.findSubscribedChatroomIds(chatrooms.stream()
-                .map(Chatroom::getId)
+        List<BatchRankingResult> rankingResults = rankingFacade.calculateRankings(chatrooms);
+        Set<Long> subscribedChatroomIds = subscribeService.findSubscribedChatroomIds(rankingResults.stream()
+                .map(result -> result.chatroom().getId())
                 .toList());
 
-        int calculatedRankingCount = 0;
         int broadcastMessageCount = 0;
         int skippedBroadcastMessageCount = 0;
-        for (Chatroom chatroom : chatrooms) {
-            RankingResponsePayload payload = rankingFacade.calculateRanking(chatroom);
-            if (payload == null) {
-                continue;
-            }
-
-            calculatedRankingCount++;
-            Long chatroomId = chatroom.getId();
+        for (BatchRankingResult result : rankingResults) {
+            Long chatroomId = result.chatroom().getId();
             if (!subscribedChatroomIds.contains(chatroomId)) {
                 skippedBroadcastMessageCount++;
                 continue;
@@ -158,15 +152,15 @@ public class RankingScheduler {
 
             messagingTemplate.convertAndSend(
                     SubscribeEndpoint.CHATROOM_SUBSCRIBE_PREFIX + chatroomId,
-                    payload.mapToBasePayload()
+                    result.payload().mapToBasePayload()
             );
             broadcastMessageCount++;
         }
 
         return RankingBatchSummary.success(
                 chatrooms.size(),
-                calculatedRankingCount,
-                calculatedRankingCount,
+                rankingResults.size(),
+                rankingResults.size(),
                 broadcastMessageCount,
                 skippedBroadcastMessageCount
         );

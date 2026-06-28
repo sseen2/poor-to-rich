@@ -22,6 +22,7 @@ import com.poortorich.income.response.enums.IncomeResponse;
 import com.poortorich.iteration.entity.Iteration;
 import com.poortorich.iteration.response.CustomIterationInfoResponse;
 import com.poortorich.page.domain.Pagination;
+import com.poortorich.ranking.model.ChatroomUserExpenseAggregate;
 import com.poortorich.ranking.model.UserExpenseAggregate;
 import com.poortorich.user.entity.User;
 import lombok.RequiredArgsConstructor;
@@ -316,6 +317,18 @@ public class AccountBookService {
         }
 
         return accountBookRepository.findExpenseAggregatesByUsersInRange(users, startDate, endDate);
+    }
+
+    public List<ChatroomUserExpenseAggregate> getExpenseAggregatesForChatroomsInRange(
+            List<Long> chatroomIds,
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
+        if (chatroomIds == null || chatroomIds.isEmpty()) {
+            return List.of();
+        }
+
+        return accountBookRepository.findExpenseAggregatesByChatroomsInRange(chatroomIds, startDate, endDate);
     }
 
     public Long getTotalAmount(User user, LocalDate startDate, LocalDate endDate, AccountBookType type) {

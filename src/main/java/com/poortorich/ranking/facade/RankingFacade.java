@@ -12,11 +12,17 @@ import com.poortorich.chat.util.mapper.ParticipantProfileMapper;
 import com.poortorich.chat.validator.ChatParticipantValidator;
 import com.poortorich.global.date.util.DateConverter;
 import com.poortorich.ranking.entity.Ranking;
+import com.poortorich.ranking.model.BatchRankingResult;
+import com.poortorich.ranking.model.ChatroomUserExpenseAggregate;
+import com.poortorich.ranking.model.RankingBatchSource;
+import com.poortorich.ranking.model.RankingCalculationResult;
 import com.poortorich.ranking.model.Rankers;
 import com.poortorich.ranking.payload.response.RankingResponsePayload;
 import com.poortorich.ranking.response.AllRankingsResponse;
 import com.poortorich.ranking.response.LatestRankingResponse;
 import com.poortorich.ranking.response.RankingInfoResponse;
+import com.poortorich.ranking.service.RankingBatchReadService;
+import com.poortorich.ranking.service.RankingBatchWriteService;
 import com.poortorich.ranking.service.RankingService;
 import com.poortorich.ranking.util.RankingBuilder;
 import com.poortorich.ranking.util.calculator.RankingCalculator;
@@ -27,15 +33,18 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -50,6 +59,8 @@ public class RankingFacade {
     private final ChatParticipantService chatParticipantService;
     private final ChatMessageService chatMessageService;
     private final RankingService rankingService;
+    private final RankingBatchReadService rankingBatchReadService;
+    private final RankingBatchWriteService rankingBatchWriteService;
 
     private final ParticipantProfileMapper profileMapper;
     private final RankingCalculator rankingCalculator;
@@ -87,6 +98,93 @@ public class RankingFacade {
             eventPublisher.publishEvent(new UserProfileUpdateEvent(prevFLexer.getUser().getUsername()));
         }
         return chatMessageService.saveRankingMessage(chatroom, ranking);
+    }
+
+    public List<BatchRankingResult> calculateRankings(List<Chatroom> chatrooms) {
+        if (chatrooms == null || chatrooms.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> chatroomIds = chatrooms.stream()
+                .map(Chatroom::getId)
+                .toList();
+        RankingPeriod period = getLastWeekPeriod();
+        RankingBatchSource source = rankingBatchReadService.read(chatroomIds, period.startDate(), period.endDate());
+
+        List<RankingCalculationResult> calculations = chatrooms.stream()
+                .map(chatroom -> calculateBatchRanking(
+                        chatroom,
+                        source.participantsByChatroomId().getOrDefault(chatroom.getId(), List.of()),
+                        source.participantByChatroomAndUserId().getOrDefault(chatroom.getId(), Map.of()),
+                        source.aggregatesByChatroomId().getOrDefault(chatroom.getId(), List.of())
+                ))
+                .flatMap(Optional::stream)
+                .toList();
+
+        return rankingBatchWriteService.save(chatroomIds, calculations);
+    }
+
+    private Optional<RankingCalculationResult> calculateBatchRanking(
+            Chatroom chatroom,
+            List<ChatParticipant> participants,
+            Map<Long, ChatParticipant> participantByUserId,
+            List<ChatroomUserExpenseAggregate> aggregates
+    ) {
+        if (participants.size() < 2 || aggregates.isEmpty()) {
+            return Optional.empty();
+        }
+
+        List<BatchRanker> rankers = aggregates.stream()
+                .filter(aggregate -> aggregate.getExpenseDaysCount() >= 3)
+                .map(aggregate -> {
+                    ChatParticipant participant = participantByUserId.get(aggregate.getUserId());
+                    if (Objects.isNull(participant)) {
+                        return null;
+                    }
+                    return new BatchRanker(participant, aggregate);
+                })
+                .filter(Objects::nonNull)
+                .toList();
+
+        if (rankers.size() < 2) {
+            return Optional.empty();
+        }
+
+        List<ChatParticipant> savers = rankers.stream()
+                .sorted(Comparator.comparing(BatchRanker::score))
+                .map(BatchRanker::participant)
+                .toList();
+        List<ChatParticipant> flexers = rankers.stream()
+                .sorted(Comparator.comparing(BatchRanker::score).reversed())
+                .map(BatchRanker::participant)
+                .toList();
+
+        Ranking ranking = Ranking.builder()
+                .chatroom(chatroom)
+                .saverFirst(getUserId(savers, 0))
+                .saverSecond(getUserId(savers, 1))
+                .saverThird(getUserId(savers, 2))
+                .flexerFirst(getUserId(flexers, 0))
+                .flexerSecond(getUserId(flexers, 1))
+                .flexerThird(getUserId(flexers, 2))
+                .build();
+
+        return Optional.of(new RankingCalculationResult(chatroom, ranking, savers, flexers));
+    }
+
+    private Long getUserId(List<ChatParticipant> participants, int index) {
+        if (participants.size() <= index) {
+            return null;
+        }
+
+        return participants.get(index).getUser().getId();
+    }
+
+    private RankingPeriod getLastWeekPeriod() {
+        LocalDate today = LocalDate.now();
+        LocalDate lastWeekSunday = today.with(TemporalAdjusters.previous(DayOfWeek.SUNDAY));
+        LocalDate lastWeekMonday = lastWeekSunday.with(TemporalAdjusters.previous(DayOfWeek.MONDAY));
+        return new RankingPeriod(lastWeekMonday, lastWeekSunday);
     }
 
     @Transactional(readOnly = true)
@@ -266,4 +364,13 @@ public class RankingFacade {
         }
     }
 
+    private record RankingPeriod(LocalDate startDate, LocalDate endDate) {
+    }
+
+    private record BatchRanker(ChatParticipant participant, ChatroomUserExpenseAggregate aggregate) {
+        private BigDecimal score() {
+            double dayRatio = aggregate.getExpenseDaysCount() / 7.;
+            return aggregate.getTotalCostAsBigDecimal().multiply(BigDecimal.valueOf(dayRatio));
+        }
+    }
 }

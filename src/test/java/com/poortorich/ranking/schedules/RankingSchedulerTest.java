@@ -41,7 +41,7 @@ class RankingSchedulerTest {
                         .build())
                 .toList();
         when(chatroomService.getChatroomsByRankingEnabledIsTrue()).thenReturn(chatrooms);
-        when(rankingFacade.calculateRanking(org.mockito.ArgumentMatchers.any(Chatroom.class))).thenReturn(null);
+        when(rankingFacade.calculateRankings(org.mockito.ArgumentMatchers.anyList())).thenReturn(List.of());
 
         RankingScheduler scheduler = new RankingScheduler(
                 rankingFacade,
@@ -54,7 +54,6 @@ class RankingSchedulerTest {
 
         scheduler.calculateAndBroadcastWeeklyRankingBatch();
 
-        verify(rankingFacade, org.mockito.Mockito.times(100))
-                .calculateRanking(argThat(chatrooms.subList(0, 100)::contains));
+        verify(rankingFacade).calculateRankings(argThat(batch -> batch.equals(chatrooms.subList(0, 100))));
     }
 }
