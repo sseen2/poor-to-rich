@@ -22,6 +22,7 @@ import com.poortorich.chat.realtime.payload.response.RankingStatusMessagePayload
 import com.poortorich.chat.realtime.payload.response.UserChatMessagePayload;
 import com.poortorich.chat.realtime.payload.response.UserEnterResponsePayload;
 import com.poortorich.chat.realtime.payload.response.UserLeaveResponsePayload;
+import com.poortorich.chat.repository.ChatMessageBulkRepository;
 import com.poortorich.chat.repository.ChatMessageRepository;
 import com.poortorich.ranking.entity.Ranking;
 import com.poortorich.ranking.payload.response.RankingResponsePayload;
@@ -48,6 +49,7 @@ import java.util.Optional;
 public class ChatMessageService {
 
     private final ChatMessageRepository chatMessageRepository;
+    private final ChatMessageBulkRepository chatMessageBulkRepository;
     private final UnreadChatMessageService unreadChatMessageService;
 
     private final RankerProfileMapper rankerProfileMapper;
@@ -330,9 +332,7 @@ public class ChatMessageService {
             return List.of();
         }
 
-        return chatMessageRepository.saveAll(rankings.stream()
-                .map(ranking -> RankingMessageBuilder.buildRankingMessage(ranking.getChatroom(), ranking))
-                .toList());
+        return chatMessageBulkRepository.saveRankingMessages(rankings);
     }
 
     @Transactional(readOnly = true)
