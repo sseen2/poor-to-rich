@@ -6,7 +6,6 @@ import com.poortorich.chat.entity.enums.RankingStatus;
 import com.poortorich.chat.realtime.event.user.UserProfileUpdateEvent;
 import com.poortorich.ranking.entity.Ranking;
 import com.poortorich.ranking.model.Rankers;
-import com.poortorich.ranking.repository.RankingBulkRepository;
 import com.poortorich.ranking.repository.RankingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -23,7 +22,6 @@ import java.util.Objects;
 public class RankingService {
 
     private final RankingRepository rankingRepository;
-    private final RankingBulkRepository rankingBulkRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     public Ranking findLatestRanking(Chatroom chatroom, LocalDateTime start, LocalDateTime end) {
@@ -54,7 +52,7 @@ public class RankingService {
             return List.of();
         }
 
-        return rankingBulkRepository.saveAll(rankings);
+        return rankingRepository.saveAll(rankings);
     }
 
     @Transactional
