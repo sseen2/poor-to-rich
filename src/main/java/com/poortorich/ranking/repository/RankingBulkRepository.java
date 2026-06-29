@@ -17,7 +17,7 @@ import java.util.stream.LongStream;
 @Slf4j
 public class RankingBulkRepository {
 
-    private static final int BULK_INSERT_CHUNK_SIZE = 100;
+    private static final int BULK_INSERT_CHUNK_SIZE = 500;
 
     private final JdbcTemplate jdbcTemplate;
     private final RankingRepository rankingRepository;
